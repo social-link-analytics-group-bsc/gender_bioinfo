@@ -35,7 +35,7 @@ def process_robot_page(doi_link, driver, count, start):
             now = time.time()
             time_from_beginning = now - start
             logging.info(f"{count}, {time_from_beginning}")
-            time_to_sleep = random.randint(30, 50)
+            time_to_sleep = random.randint(5, 10)
             time.sleep(time_to_sleep)
             return driver.current_url
         elif 'unavailable' in driver.current_url:
@@ -47,7 +47,7 @@ def process_article_page(doi_link, driver, count, start, db):
     now = time.time()
     time_from_beginning = now - start
     logging.info(f"{count}, {time_from_beginning}")
-    time_to_sleep = random.randint(30, 50)
+    time_to_sleep = random.randint(5, 10)
     time.sleep(time_to_sleep)
     db.update_record({'DOI': doi_link}, {'link': driver.current_url, 'authors': authors})
 
