@@ -12,6 +12,14 @@ logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gen
                     level=logging.DEBUG)
 
 
+def is_robot_page(driver):
+    try:
+        robot_element = driver.find_element_by_xpath("//button[@id='btnSubmit']")
+        return robot_element and robot_element.text.lower() == 'take me to my content'
+    except:
+        return False
+
+
 def process_unavailable_page(count, start):
     now = time.time()
     time_from_beginning = now - start
@@ -31,15 +39,17 @@ def process_robot_page(doi_link, driver, count, start):
         element = driver.find_element_by_xpath("//input[@name='hdl'][@type='text']")
         element.send_keys(str(doi_link))
         element.submit()
-        if len(driver.current_url) <= 70:
+        if is_robot_page(driver):
+            continue
+        if 'unavailable' in driver.current_url:
+            return process_unavailable_page(count, start)
+        else:
             now = time.time()
             time_from_beginning = now - start
             logging.info(f"{count}, {time_from_beginning}")
             time_to_sleep = random.randint(5, 10)
             time.sleep(time_to_sleep)
             return driver.current_url
-        elif 'unavailable' in driver.current_url:
-            return process_unavailable_page(count, start)
 
 
 def process_article_page(doi_link, driver, count, start, db):
@@ -73,20 +83,19 @@ def get_authors_links_untrackable_journals(doi_list, db):
             element = driver.find_element_by_xpath("//input[@name='hdl'][@type='text']")
             element.send_keys(str(doi_link))
             element.submit()
-            if len(driver.current_url) > 70:
+            if 'unavailable' in driver.current_url:
                 # page not found...
-                if 'unavailable' in driver.current_url:
-                    logging.info('Page not found!')
-                    process_unavailable_page(count, start)
-                    db.update_record({'DOI': doi_link}, {'link': None, 'authors': None})
+                logging.info('Page not found!')
+                process_unavailable_page(count, start)
+                db.update_record({'DOI': doi_link}, {'link': None, 'authors': None})
+            elif is_robot_page(driver):
                 # we are detected as robots...
+                logging.info('We were detected as robot :(')
+                link_to_append = process_robot_page(doi_link, driver, count, start)
+                if not None:
+                    process_article_page(doi_link, driver, count, start, db)
                 else:
-                    logging.info('We were detected as robot :(')
-                    link_to_append = process_robot_page(doi_link, driver, count, start)
-                    if not None:
-                        process_article_page(doi_link, driver, count, start, db)
-                    else:
-                        db.update_record({'DOI': doi_link}, {'link': link_to_append, 'authors': None})
+                    db.update_record({'DOI': doi_link}, {'link': link_to_append, 'authors': None})
             else:
                 logging.info('Getting the article link and authors')
                 process_article_page(doi_link, driver, count, start, db)
