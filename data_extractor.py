@@ -124,13 +124,15 @@ def extra_data_untrackable_journals(db):
     oxford_bioinformatics = db.search({'source': 'oxford bioinformatics', 'link': {'$exists': 0},
                                        'authors': {'$exists': 0}})
     list_DOI_oxford_bioinformatics = [article['DOI'] for article in oxford_bioinformatics]
-    get_authors_links_untrackable_journals(list_DOI_oxford_bioinformatics, db)
+    if len(list_DOI_oxford_bioinformatics) > 0:
+        get_authors_links_untrackable_journals(list_DOI_oxford_bioinformatics, db)
 
     # Collect links and authors from nucleic acids research
     nucleic_bioinformatics = db.search({'source': 'nucleic acids research', 'link': {'$exists': 0},
                                         'authors': {'$exists': 0}})
     list_DOI_nucleic_acids_research = [article['DOI'] for article in nucleic_bioinformatics]
-    get_authors_links_untrackable_journals(list_DOI_nucleic_acids_research, db)
+    if len(list_DOI_nucleic_acids_research) > 0:
+        get_authors_links_untrackable_journals(list_DOI_nucleic_acids_research, db)
 
 
 def obtain_author_gender(db):
