@@ -1,5 +1,5 @@
 
-from data_extractor import extra_data_untrackable_journals
+from data_extractor import extra_data_untrackable_journals, obtain_author_gender
 from db_manager import DBManager
 
 import csv
@@ -23,4 +23,5 @@ def load_data_from_file_into_db(db):
 if __name__ == '__main__':
     db = DBManager('gender_authors')
     # load_data_from_file_into_db(db)
-    extra_data_untrackable_journals(db)
+    # extra_data_untrackable_journals(db)
+    obtain_author_gender(db)
