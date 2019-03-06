@@ -1,4 +1,5 @@
 import bs4
+import gender_guesser.detector as gender
 import logging
 import pathlib
 import random
@@ -107,14 +108,23 @@ def get_authors_links_untrackable_journals(doi_list, db):
     return
 
 
-def gender_id(article, gendre_api):
+def gender_id(article, gendre_api, gendre_api2):
     genders = []
 
     for person in article['authors']:
         first_name = person.split()[0]
         last_name = person.split()[-1]
-        resp = gendre_api(first_name.encode('utf-8'), last_name.encode('utf-8')).GET()
-        genders.append(resp.json().get('gender'))
+        resp = gendre_api(first_name, last_name).GET()
+        try:
+            author_gender = resp.json().get('gender')
+            if author_gender == 'unknown':
+                logging.info('Trying to get the author\'s gender using the second api')
+                # if the main api returns unknown gender, try with another api
+                author_gender = gendre_api2.get_gender(first_name)
+                author_gender = 'unknown' if author_gender == 'andy' else author_gender
+            genders.append(author_gender)
+        except:
+            genders.append('error_api')
 
     return genders
 
@@ -137,31 +147,11 @@ def extra_data_untrackable_journals(db):
 
 def obtain_author_gender(db):
     gendre_api = GendreAPI("http://api.namsor.com/onomastics/api/json/gendre")
+    gendre_api2 = gender.Detector(case_sensitive=False)
 
-    articles = db.search({'authors': {'$and': [{'$exists': 1}, {'$ne': None}]}})
+    articles = db.search({'authors': {'$exists': 1, '$ne': None}})
     for article in articles:
-        genders = gender_id(article, gendre_api)
+        logging.info(f"Finding out the gender of the authors {article['authors']} of the paper {article['DOI']}")
+        genders = gender_id(article, gendre_api, gendre_api2)
+        logging.info(f"Genders identified: {genders}")
         db.update_record({'DOI': article['DOI']}, {'authors_gender': genders})
-
-    # genders_oxford_bioinformatics = gender_id(authors_oxford_bioinformatics, gendre_api)
-    # genders_nucleic_acids_research = gender_id(authors_nucleic_acids_research)
-
-    #
-    # with open(cwd + '/data/genders_oxford_bioinformatics.txt', 'w') as file_handler:
-    #     for item in genders_oxford_bioinformatics:
-    #         file_handler.write("{}\n".format(item))
-    #
-    #
-    # with open(cwd + '/data/genders_nucleic_acids_research.txt', 'w') as file_handler:
-    #     for item in genders_nucleic_acids_research:
-    #         file_handler.write("{}\n".format(item))
-    #
-    # db_oxford_bioinformatics = foundations_data[foundations_data['source'] == 'oxford bioinformatics']
-    # db_oxford_bioinformatics['authors_fullname'] = authors_oxford_bioinformatics
-    # db_oxford_bioinformatics['genders'] = genders_oxford_bioinformatics
-    # db_oxford_bioinformatics.to_csv(cwd + '/data/db_oxford.csv', index=False)
-    #
-    # db_nucleic_acids_research = foundations_data[foundations_data['source'] == 'nucleic acids research']
-    # db_nucleic_acids_research['authors_fullname'] = authors_nucleic_acids_research
-    # db_nucleic_acids_research['genders'] = genders_nucleic_acids_research
-    # db_nucleic_acids_research.to_csv(cwd + '/data/db_nucleic.csv', index=False)
