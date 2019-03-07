@@ -1,8 +1,9 @@
 
 from data_extractor import extra_data_untrackable_journals, obtain_author_gender
+from data_loader import load_data_from_file_into_db
+from data_wrangler import create_paper_authors_collection
 from db_manager import DBManager
 
-import csv
 import logging
 import pathlib
 
@@ -10,18 +11,9 @@ logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gen
                     level=logging.DEBUG)
 
 
-def load_data_from_file_into_db(db):
-    current_dir = pathlib.Path(__file__).parents[0]
-    bio_file_name = current_dir.joinpath('data', 'biolitmap_data.csv')
-    with open(str(bio_file_name), 'r', encoding='ISO-8859-1') as f:
-        file = csv.DictReader(f, delimiter='\t')
-        for line in file:
-            line['source'] = line['source'].lower()
-            db.store_record(line)
-
-
 if __name__ == '__main__':
-    db = DBManager('gender_authors')
-    # load_data_from_file_into_db(db)
+    db = DBManager('bioinfo_papers')
+    # load_data_from_file_into_db(db, 'biolitmap_data.csv')
     # extra_data_untrackable_journals(db)
-    obtain_author_gender(db)
+    # obtain_author_gender(db)
+    create_paper_authors_collection(db)
