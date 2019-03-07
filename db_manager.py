@@ -42,12 +42,19 @@ class DBManager:
         return self.__db[self.__collection].find(query, no_cursor_timeout=True)
 
     def store_record(self, record_to_store):
-        record_identifier = record_to_store['DOI']
-        num_results = self.search({'DOI': record_identifier}).count()
+        num_results = 0
+        if 'DOI' in record_to_store:
+            record_identifier = record_to_store['DOI']
+            num_results = self.search({'DOI': record_identifier}).count()
+        else:
+            record_identifier = record_to_store['name']
         if num_results == 0:
             self.save_record(record_to_store)
-            logging.info(f"Inserted record with DOI: {record_identifier}")
+            logging.info(f"Inserted record identified by: {record_identifier}")
             return True
         else:
-            logging.info(f"Found record duplicated DOI: {record_identifier}")
+            logging.info(f"Found record duplicated. Identifier: {record_identifier}")
             return False
+
+    def aggregate(self, pipeline):
+        return [doc for doc in self.__db[self.__collection].aggregate(pipeline, allowDiskUse=True)]
