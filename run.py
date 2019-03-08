@@ -16,5 +16,5 @@ if __name__ == '__main__':
     # load_data_from_file_into_db(db, 'biolitmap_data.csv')
     # extra_data_untrackable_journals(db)
     # obtain_author_gender(db)
-    create_paper_authors_collection(db)
-    #compute_authors_h_index()
+    # create_paper_authors_collection(db)
+    compute_authors_h_index()
