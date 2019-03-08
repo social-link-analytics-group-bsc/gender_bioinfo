@@ -1,7 +1,7 @@
 
 from data_extractor import extra_data_untrackable_journals, obtain_author_gender
 from data_loader import load_data_from_file_into_db
-from data_wrangler import create_paper_authors_collection
+from data_wrangler import create_paper_authors_collection, compute_authors_h_index
 from db_manager import DBManager
 
 import logging
@@ -17,3 +17,4 @@ if __name__ == '__main__':
     # extra_data_untrackable_journals(db)
     # obtain_author_gender(db)
     create_paper_authors_collection(db)
+    #compute_authors_h_index()
