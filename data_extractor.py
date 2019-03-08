@@ -1,3 +1,4 @@
+import ast
 import bs4
 import gender_guesser.detector as gender
 import logging
@@ -108,6 +109,17 @@ def get_authors_links_untrackable_journals(doi_list, db):
     return
 
 
+def get_authors_ncbi_journal(db):
+    driver = webdriver.Chrome()
+
+    ncbi_papers = db.search({'authors_gender': {'$exists':0}})
+    for paper in ncbi_papers:
+        logging.info(f"Processing article with DOI: {paper['DOI']}")
+        driver.get(paper['link'])
+        authors = driver.find_element_by_xpath("//div[contains(@class,'contrib-group fm-author')]").text.split(',')
+
+
+
 def gender_id(article, gendre_api, gendre_api2):
     genders = []
 
@@ -149,7 +161,7 @@ def obtain_author_gender(db):
     gendre_api = GendreAPI("http://api.namsor.com/onomastics/api/json/gendre")
     gendre_api2 = gender.Detector(case_sensitive=False)
 
-    articles = db.search({'authors': {'$exists': 1, '$ne': None}})
+    articles = db.search({'authors': {'$exists': 1, '$ne': None}, 'authors_gender': {'$exists': 0}})
     for article in articles:
         logging.info(f"Finding out the gender of the authors {article['authors']} of the paper {article['DOI']}")
         genders = gender_id(article, gendre_api, gendre_api2)
