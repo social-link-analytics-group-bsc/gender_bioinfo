@@ -68,19 +68,24 @@ def create_paper_authors_collection(db_papers):
                 logging.info(f"Creado author {author}")
 
 
-def compute_authors_h_index():
+def compute_authors_h_index(override_metric=False):
     db_authors = DBManager('bioinfo_authors')
     authors = db_authors.search({})
     for author in authors:
+        if 'h-index' in author.keys() and not override_metric:
+            continue
+        logging.info(f"Computing h-index of {author['name']}")
         author_citations = author['citations']
-        h_index = author['papers']
-        while h_index > 0:
-            greater_counter = 0
-            for citation in author_citations:
-                if citation >= h_index:
-                    greater_counter += 1
-            if greater_counter == h_index:
-                break
-            else:
-                h_index -= 1
+        h_index = author['papers_with_citations']
+        if h_index > 0:
+            while True:
+                greater_counter = 0
+                for citation in author_citations:
+                    if citation >= h_index:
+                        greater_counter += 1
+                if greater_counter >= h_index:
+                    break
+                else:
+                    h_index -= 1
+        logging.info(f"{author['name']} has an h-index of {h_index}")
         db_authors.update_record({'name': author['name']}, {'h-index': h_index})
