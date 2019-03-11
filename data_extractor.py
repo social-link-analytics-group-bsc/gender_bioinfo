@@ -4,6 +4,7 @@ import gender_guesser.detector as gender
 import logging
 import pathlib
 import random
+import re
 import time
 
 from selenium import webdriver
@@ -111,13 +112,23 @@ def get_authors_links_untrackable_journals(doi_list, db):
 
 def get_authors_ncbi_journal(db):
     driver = webdriver.Chrome()
+    regex = re.compile("[^\w\s]")
 
     ncbi_papers = db.search({'authors_gender': {'$exists':0}})
     for paper in ncbi_papers:
         logging.info(f"Processing article with DOI: {paper['DOI']}")
         driver.get(paper['link'])
-        authors = driver.find_element_by_xpath("//div[contains(@class,'contrib-group fm-author')]").text.split(',')
-
+        authors = driver.find_element_by_class_name("fm-author").find_elements_by_xpath(".//*")
+        paper_authors = []
+        for author in authors:
+            paper_author = regex.sub('', author.text)
+            if paper_author != '':
+                paper_authors.append(paper_author)
+        if paper_authors:
+            db.update_record({'DOI': paper['DOI']}, {'link': driver.current_url, 'authors': paper_authors})
+        else:
+            db.update_record({'DOI': paper['DOI']}, {'link': driver.current_url, 'authors': None})
+    return True
 
 
 def gender_id(article, gendre_api, gendre_api2):
