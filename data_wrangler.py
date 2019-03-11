@@ -8,7 +8,7 @@ logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gen
                     level=logging.DEBUG)
 
 
-def create_paper_authors_collection(db_papers):
+def create_update_paper_authors_collection(db_papers):
     db_authors = DBManager('bioinfo_authors')
 
     articles = db_papers.search({})
