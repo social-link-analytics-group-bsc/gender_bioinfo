@@ -235,21 +235,24 @@ def get_country_from_string(countries, str):
 
 
 def obtain_author_info_nucleid(db_authors, html, countries):
+    regex = re.compile('[0-9*]')
     soup = bs4.BeautifulSoup(html, 'html.parser')
     # Get authors' names and superscripts
     authors = soup.find('div', class_='contrib-group fm-author').text.split(',')
-    c_author = authors[0]
+    c_author = authors[0].strip()
     dict_authors = dict()
     author_indexes = []
     for author in authors[1: len(authors)]:
-        for author_txt in author.split(' '):
-            if author_txt.isdigit():
-                author_indexes.append(author_txt)
-            else:
-                dict_authors[c_author] = {'indexes': author_indexes.copy()}
-                c_author = author_txt
-                author_indexes.clear()
-    dict_authors[c_author] = {'indexes': author_indexes.copy()}
+        if author.isdigit():
+            author_indexes.append(author)
+            continue
+        if author[0].isdigit():
+            author_indexes.append(author[0])
+        dict_authors[c_author] = {'indexes': author_indexes.copy()}
+        c_author = regex.sub('', author).replace('and', '').strip()
+        author_indexes.clear()
+    if c_author and c_author not in dict_authors.keys():
+        dict_authors[c_author.replace('and', '').strip()] = {'indexes': author_indexes.copy()}
     # Get authors' affiliations
     author_affiliations = list(soup.find('div', class_='fm-affl').children)
     index = '0'
@@ -304,5 +307,6 @@ def obtain_author_affiliation(db_papers, db_authors):
             # obtain_author_info_academic(db_authors, driver.page_source)
             pass
         else:
-            driver.get(paper['link'])
+            #driver.get(paper['link'])
+            driver.get('https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2532730/')
             obtain_author_info_nucleid(db_authors, driver.page_source, countries)
