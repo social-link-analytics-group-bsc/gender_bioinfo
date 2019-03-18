@@ -1,4 +1,3 @@
-import ast
 import bs4
 import gender_guesser.detector as gender
 import logging
@@ -178,3 +177,132 @@ def obtain_author_gender(db):
         genders = gender_id(article, gendre_api, gendre_api2)
         logging.info(f"Genders identified: {genders}")
         db.update_record({'DOI': article['DOI']}, {'authors_gender': genders})
+
+
+def update_author_affiliations(author_record, affiliation_to_save):
+    affiliations = author_record['affiliations']
+    for affiliation in affiliations:
+        if affiliation.lower() not in affiliation_to_save.lower():
+            affiliations.append(affiliation_to_save)
+            break
+    return affiliations
+
+
+def update_author_countries(author_record, country_to_save):
+    countries = author_record['countries']
+    for country in countries:
+        if country.lower() not in country_to_save.lower():
+            countries.append(country_to_save)
+            break
+    return countries
+
+
+def obtain_author_info_academic(db_authors, html):
+    regex = re.compile('[0-9]')
+    soup = bs4.BeautifulSoup(html, 'html.parser')
+    elements = soup.find_all(id='authorInfo_OUP_ArticleTop_Info_Widget')
+
+    for element in elements:
+        author_details = element.text
+        author_lines = [line for line in author_details.splitlines() if line]
+        author_name = author_lines[0].strip()
+        author_affiliation = author_lines[1].strip()
+        author_research_center = ' '.join(regex.sub('', author_affiliation).split())
+        author_country = author_affiliation.split(',')[-1].strip()
+        author_db = db_authors.find_record({'name': author_name})
+        if author_db:
+            new_vals = dict()
+            if 'affiliations' in author_db.keys():
+                new_vals['affiliations'] = update_author_affiliations(author_db, author_research_center)
+            else:
+                new_vals['affiliations'] = [author_research_center]
+            if 'countries' in author_db.keys():
+                new_vals['countries'] = update_author_countries(author_db, author_country)
+            else:
+                new_vals['countries'] = [author_country]
+            db_authors.update_record({'name': author_name}, new_vals)
+        else:
+            logging.error(f"The author {author_name} doesn't exist in the database!")
+
+
+def get_country_from_string(countries, str):
+    for country in countries['names']:
+        for word in str.split(' '):
+            curated_word = word.replace(',', '').strip()
+            if curated_word.lower() == country.lower():
+                return country
+    return None
+
+
+def obtain_author_info_nucleid(db_authors, html, countries):
+    soup = bs4.BeautifulSoup(html, 'html.parser')
+    # Get authors' names and superscripts
+    authors = soup.find('div', class_='contrib-group fm-author').text.split(',')
+    c_author = authors[0]
+    dict_authors = dict()
+    author_indexes = []
+    for author in authors[1: len(authors)]:
+        for author_txt in author.split(' '):
+            if author_txt.isdigit():
+                author_indexes.append(author_txt)
+            else:
+                dict_authors[c_author] = {'indexes': author_indexes.copy()}
+                c_author = author_txt
+                author_indexes.clear()
+    dict_authors[c_author] = {'indexes': author_indexes.copy()}
+    # Get authors' affiliations
+    author_affiliations = list(soup.find('div', class_='fm-affl').children)
+    index = '0'
+    for affiliation in author_affiliations:
+        if 'sup' == affiliation.name:
+            index = affiliation.text
+            continue
+        else:
+            for author_name, val in dict_authors.items():
+                if index in val['indexes']:
+                    curated_affiliation = affiliation.strip()
+                    if 'affiliations' not in dict_authors[author_name].keys():
+                        dict_authors[author_name]['affiliations'] = [curated_affiliation]
+                    else:
+                        dict_authors[author_name]['affiliations'].append(curated_affiliation)
+                    affiliation_country = get_country_from_string(countries, curated_affiliation)
+                    if affiliation_country:
+                        if 'countries' not in dict_authors[author_name].keys():
+                            dict_authors[author_name]['countries'] = [affiliation_country]
+                        else:
+                            dict_authors[author_name]['countries'].append(affiliation_country)
+    # Update authors' information
+    new_vals = {}
+    for author_name, val in dict_authors.items():
+        author_db = db_authors.find_record({'name': author_name})
+        if 'countries' not in author_db.keys():
+            new_vals['countries'] = val['countries']
+            new_vals['affiliations'] = val['affiliations']
+        else:
+            new_vals['countries'] = list(set(author_db['countries'].extend(val['countries'])))
+            new_vals['affiliations'] = list(set(author_db['affiliations'].extend(val['affiliations'])))
+        db_authors.update_record({'name': author_name}, new_vals)
+
+
+def obtain_author_affiliation(db_papers, db_authors):
+    driver = webdriver.Chrome()
+    papers = db_papers.search({'link': {'$exists': 1}})
+
+    # Read and store countries
+    countries = {'names': [], 'prefixes': []}
+    with open(str('data/country_list.txt'), 'r') as f:
+        for _, line in enumerate(f):
+            line = line.split(':')
+            countries['names'].append(line[1].replace('\n', ''))
+            countries['prefixes'].append(line[0].replace('\n', ''))
+    countries['names'].append('UK')
+
+    for paper in papers:
+        logging.info(f"Obtaining affiliation of the author of the paper with DOI: {paper['DOI']}")
+        if 'academic.oup.com' in paper['link']:
+            # driver.get(paper['link'])
+            # obtain_author_info_academic(db_authors, driver.page_source)
+            pass
+        else:
+            driver.get(paper['link'])
+            obtain_author_info_nucleid(db_authors, driver.page_source, countries)
