@@ -37,4 +37,3 @@ def update_data_from_file(filename):
                 except:
                     logging.error(f"Could not update the paper {line['DOI']}")
                 db.update_record({'DOI': line['DOI']}, line, create_if_doesnt_exist=True)
-
