@@ -186,11 +186,11 @@ def obtain_author_gender(db):
 
 def curate_author_name(author_raw):
     regex = re.compile('[0-9*]')
-    return regex.sub('', author_raw).replace('and', '').strip()
+    return regex.sub('', author_raw).replace(' and ', ' ').strip()
 
 
 def curate_affiliation_name(affiliation_raw):
-    return affiliation_raw.replace('and', '').strip().rstrip(',').lstrip(',')
+    return affiliation_raw.replace(' and ', ' ').strip().rstrip(',').lstrip(',')
 
 
 def update_author_affiliation_and_country(db_authors, dict_authors, paper):
@@ -317,10 +317,7 @@ def obtain_author_info_nucleid(db_authors, html, countries, paper):
     update_author_affiliation_and_country(db_authors, dict_authors, paper)
 
 
-def obtain_author_affiliation(db_papers, db_authors):
-    driver = webdriver.Chrome()
-    papers = db_papers.search({'link': {'$exists': 1}})
-
+def load_countries_file():
     # Read and store countries
     countries = {'names': [], 'prefixes': []}
     with open(str('data/country_list.txt'), 'r') as f:
@@ -329,9 +326,12 @@ def obtain_author_affiliation(db_papers, db_authors):
             countries['names'].append(line[1].replace('\n', ''))
             countries['prefixes'].append(line[0].replace('\n', ''))
     countries['names'].extend(['UK', 'USA'])
+    return countries
 
-    for paper in papers:
-        logging.info(f"Obtaining affiliation of the author of the paper with DOI: {paper['DOI']}")
+
+def do_obtain_affiliation(paper, driver, db_authors, countries):
+    logging.info(f"Obtaining affiliation of the author of the paper with DOI: {paper['DOI']}")
+    if 'link' in paper.keys():
         if 'academic.oup.com' in paper['link']:
             driver.get(paper['link'])
             obtain_author_info_academic(db_authors, driver.page_source, countries, paper)
@@ -339,4 +339,37 @@ def obtain_author_affiliation(db_papers, db_authors):
             driver.get(paper['link'])
             obtain_author_info_nucleid(db_authors, driver.page_source, countries, paper)
         else:
-            logging.info(f"Unknown the domain name of the paper link {paper['link']}")
+            logging.warning(f"Unknown the domain name of the paper link {paper['link']}")
+    else:
+        logging.warning(f"Paper with doi {paper['DOI']} does not have a link")
+
+
+def obtain_author_affiliation(db_papers, db_authors):
+    driver = webdriver.Chrome()
+    papers = db_papers.search({'link': {'$exists': 1}})
+
+    countries = load_countries_file()
+
+    for paper in papers:
+        do_obtain_affiliation(paper, driver, db_authors, countries)
+
+
+def obtain_affiliation_from_author(db_papers, db_authors):
+    driver = webdriver.Chrome()
+    authors = db_authors.search({'affiliations': {'$exists': 0}})
+
+    # Read and store countries
+    countries = load_countries_file()
+
+    found_last = False
+    for author in authors:
+        for doi in author['dois']:
+            #if doi == '10.1093/nar/gku322':
+            #    found_last = True
+            #if not found_last:
+            #    continue
+            paper = db_papers.find_record({'DOI': doi})
+            if paper:
+                do_obtain_affiliation(paper, driver, db_authors, countries)
+            else:
+                logging.info(f"Could not find a paper with the doi {doi}")
