@@ -1,8 +1,9 @@
 
 from data_extractor import extra_data_untrackable_journals, obtain_author_gender, get_authors_ncbi_journal, \
-                           obtain_author_affiliation
+                           obtain_author_affiliation, obtain_affiliation_from_author
 from data_loader import load_data_from_file_into_db, update_data_from_file
-from data_wrangler import create_update_paper_authors_collection, compute_authors_h_index
+from data_wrangler import create_update_paper_authors_collection, compute_authors_h_index, clean_author_countries
+from data_exporter import export_db_into_file
 from db_manager import DBManager
 
 import logging
@@ -24,4 +25,9 @@ if __name__ == '__main__':
     # obtain_author_gender(db)
     # create_update_paper_authors_collection(db)
     # compute_authors_h_index()
-    obtain_author_affiliation(db_papers, db_authors)
+    # obtain_author_affiliation(db_papers, db_authors)
+    obtain_affiliation_from_author(db_papers, db_authors)
+    #clean_author_countries()
+    #export_db_into_file('bioinfo_authors.csv', db_authors, ['name', 'gender', 'papers', 'total_citations',
+    #                                                        'papers_as_first_author', 'papers_with_citations',
+    #                                                        'h-index', 'countries'])
