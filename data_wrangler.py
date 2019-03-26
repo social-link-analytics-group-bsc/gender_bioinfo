@@ -89,3 +89,25 @@ def compute_authors_h_index(override_metric=False):
                     h_index -= 1
         logging.info(f"{author['name']} has an h-index of {h_index}")
         db_authors.update_record({'name': author['name']}, {'h-index': h_index})
+
+
+def clean_author_countries():
+    db_authors = DBManager('bioinfo_authors')
+    authors = db_authors.search({})
+    countries = {'names': [], 'prefixes': []}
+    with open(str('data/country_list.txt'), 'r') as f:
+        for _, line in enumerate(f):
+            line = line.split(':')
+            countries['names'].append(line[1].replace('\n', ''))
+            countries['prefixes'].append(line[0].replace('\n', ''))
+    countries['names'].extend(['UK', 'USA'])
+    for author in authors:
+        author_current_countries = author['countries']
+        countries_to_save = []
+        for author_country in author_current_countries:
+            if author_country in countries['names']:
+                countries_to_save.append(author_country)
+            else:
+                pass
+        logging.info(f"Update the record of the {author['name']}")
+        db_authors.update_record({'name': author['name']}, {'countries': countries_to_save})
