@@ -8,6 +8,7 @@ import time
 
 from selenium import webdriver
 from hammock import Hammock as GendreAPI
+from utils import curate_author_name, curate_affiliation_name
 
 
 logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gender_identification.log')),
@@ -22,16 +23,7 @@ def is_robot_page(driver):
         return False
 
 
-def process_unavailable_page(count, start):
-    now = time.time()
-    time_from_beginning = now - start
-    logging.info(f"{count}, {time_from_beginning}")
-    logging.info('Going to sleep for 2 seconds')
-    time.sleep(2)
-    return None
-
-
-def process_robot_page(doi_link, driver, count, start):
+def process_robot_page(doi_link, driver):
     while True:
         time_to_sleep = random.randint(200, 300)
         logging.info(f"Going to sleep for {time_to_sleep} seconds")
@@ -44,11 +36,9 @@ def process_robot_page(doi_link, driver, count, start):
         if is_robot_page(driver):
             continue
         if 'unavailable' in driver.current_url:
-            return process_unavailable_page(count, start)
+            time.sleep(2)
+            return None
         else:
-            now = time.time()
-            time_from_beginning = now - start
-            logging.info(f"{count}, {time_from_beginning}")
             time_to_sleep = random.randint(5, 10)
             time.sleep(time_to_sleep)
             return driver.current_url
@@ -88,12 +78,12 @@ def get_authors_links_untrackable_journals(doi_list, db):
             if 'unavailable' in driver.current_url:
                 # page not found...
                 logging.info('Page not found!')
-                process_unavailable_page(count, start)
+                time.sleep(2)
                 db.update_record({'DOI': doi_link}, {'link': None, 'authors': None})
             elif is_robot_page(driver):
                 # we are detected as robots...
                 logging.info('We were detected as robot :(')
-                link_to_append = process_robot_page(doi_link, driver, count, start)
+                link_to_append = process_robot_page(doi_link, driver)
                 if not None:
                     process_article_page(doi_link, driver, count, start, db)
                 else:
@@ -182,15 +172,6 @@ def obtain_author_gender(db):
         genders = gender_id(article)
         logging.info(f"Genders identified: {genders}")
         db.update_record({'DOI': article['DOI']}, {'authors_gender': genders})
-
-
-def curate_author_name(author_raw):
-    regex = re.compile('[0-9*]')
-    return regex.sub('', author_raw).replace(' and ', ' ').strip()
-
-
-def curate_affiliation_name(affiliation_raw):
-    return affiliation_raw.replace(' and ', ' ').strip().rstrip(',').lstrip(',')
 
 
 def update_author_affiliation_and_country(db_authors, dict_authors, paper):
@@ -373,3 +354,44 @@ def obtain_affiliation_from_author(db_papers, db_authors):
                 do_obtain_affiliation(paper, driver, db_authors, countries)
             else:
                 logging.info(f"Could not find a paper with the doi {doi}")
+
+
+def get_paper_links(db_papers):
+    driver = webdriver.Chrome()
+    papers = db_papers.search({'link': {'$exists': 0}})
+    links = []
+    try:
+        for paper in papers:
+            logging.info(f"Getting the link of the paper {paper['DOI']}")
+            driver.get("https://dx.doi.org/")
+            element = driver.find_element_by_xpath("//input[@name='hdl'][@type='text']")
+            element.send_keys(str(paper['DOI']))
+            element.submit()
+            if 'unavailable' in driver.current_url:
+                # page not found...
+                logging.info('Page not found!')
+                db_papers.update_record({'DOI': paper['DOI']}, {'link': None, 'authors': None})
+                time.sleep(2)
+            elif is_robot_page(driver):
+                # we are detected as robots...
+                logging.info('We were detected as robot :(')
+                paper_link = process_robot_page(paper['DOI'], driver)
+                if not None:
+                    db_papers.update_record({'DOI': paper['DOI']}, {'link': paper_link})
+                    links.append(paper_link)
+                else:
+                    db_papers.update_record({'DOI': paper['DOI']}, {'link': None, 'authors': None})
+            else:
+                paper_link = driver.current_url
+                db_papers.update_record({'DOI': paper['DOI']}, {'link': paper_link})
+                links.append(paper_link)
+    except Exception as e:
+        logging.error(e)
+    finally:
+        logging.info(f"Found {len(links)} papers without links")
+        current_dir = pathlib.Path(__file__).parents[0]
+        fn = current_dir.joinpath('data', 'papers_without_links.txt')
+        with open(str(fn), 'a', encoding='utf-8') as f:
+            for link in links:
+                f.write(link)
+                f.write('\n')
