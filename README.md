@@ -8,7 +8,7 @@ Plos Computational Biology, Nucleic Acids Research, BMC bioinformatics, and BMC 
 2. Iterate over the articles' dois and get the url of the publications by using the Doi Resolution Service 
 (http://dx.doi.org/);  
 
-3. Iterate over the list of articles' urls and extract the authors and their affiliations from each article;
+3. Iterate over the list of articles' urls and extract the authors and their affiliations;
 
 4. For each author, get their gender by using the NamSor API (http://api.namsor.com/)
 
