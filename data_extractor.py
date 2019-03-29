@@ -341,14 +341,8 @@ def obtain_affiliation_from_author(db_papers, db_authors):
 
     # Read and store countries
     countries = load_countries_file()
-
-    found_last = False
     for author in authors:
         for doi in author['dois']:
-            #if doi == '10.1093/nar/gku322':
-            #    found_last = True
-            #if not found_last:
-            #    continue
             paper = db_papers.find_record({'DOI': doi})
             if paper:
                 do_obtain_affiliation(paper, driver, db_authors, countries)
