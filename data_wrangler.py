@@ -1,5 +1,6 @@
 
 from db_manager import DBManager
+from utils import curate_author_name
 
 import logging
 import pathlib
@@ -111,3 +112,55 @@ def clean_author_countries():
                 pass
         logging.info(f"Update the record of the {author['name']}")
         db_authors.update_record({'name': author['name']}, {'countries': countries_to_save})
+
+
+def fix_author_doi_list():
+    db_authors = DBManager('bioinfo_authors')
+    db_papers = DBManager('bioinfo_papers')
+    authors = db_authors.search({})
+    authors_list = [author_db for author_db in authors]
+    for author in authors_list:
+        logging.info(f"Checking the dois of the author {author['name']}")
+        dois_to_remove = []
+        for doi in author['dois']:
+            paper = db_papers.find_record({'DOI': doi})
+            if not paper:
+                logging.warning(f"Could not find the publication with the doi {doi}")
+            found_author = False
+            for paper_author in paper['authors']:
+                if paper_author.lower() == author['name'].lower():
+                    found_author = True
+                    break
+            if not found_author:
+                logging.info(f"Found that the author is not part of the authors of the paper {doi}")
+                dois_to_remove.append(doi)
+        for wrong_doi in dois_to_remove:
+            author['dois'].remove(wrong_doi)
+            logging.info(f"Removing doi {wrong_doi} from the author's list of dois")
+        db_authors.update_record({'name': author['name']}, {'dois': author['dois']})
+
+
+def curate_paper_list_authors():
+    db_papers = DBManager('bioinfo_papers')
+    papers = db_papers.search({})
+    papers_list = [paper_db for paper_db in papers]
+    for paper in papers_list:
+        logging.info(f"Curating the list of authors of the paper {paper['DOI']}")
+        curated_author_names = []
+        for author in paper['authors']:
+            curated_author_names.append(curate_author_name(author))
+        db_papers.update_record({'DOI': paper['DOI']}, {'authors': curated_author_names})
+
+
+def curate_authors_name():
+    db_authors = DBManager('bioinfo_authors')
+    authors = db_authors.search({})
+    authors_list = [author_db for author_db in authors]
+    found_last = False
+    for author in authors_list:
+        if author['name'] == 'Josep A Calduch-Giner':
+            found_last = True
+        if found_last:
+            logging.info(f"Curating the name of the author {author['name']}")
+            author_name = curate_author_name(author['name'])
+            db_authors.update_record({'name': author['name']}, {'name': author_name})
