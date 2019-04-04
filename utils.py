@@ -17,3 +17,15 @@ def curate_author_name(author_raw):
 
 def curate_affiliation_name(affiliation_raw):
     return affiliation_raw.replace(' and ', ' ').strip().rstrip(',').lstrip(',')
+
+
+def load_countries_file():
+    # Read and store countries
+    countries = {'names': [], 'prefixes': []}
+    with open(str('data/country_list.txt'), 'r') as f:
+        for _, line in enumerate(f):
+            line = line.split(':')
+            countries['names'].append(line[1].replace('\n', ''))
+            countries['prefixes'].append(line[0].replace('\n', ''))
+    countries['names'].extend(['UK', 'USA'])
+    return countries
