@@ -66,7 +66,7 @@ def create_update_paper_authors_collection(db_papers):
                 if int(article['citations']) > 0:
                     record_to_save['papers_with_citations'] += 1
                 db_authors.save_record(record_to_save)
-                logging.info(f"Creado author {author}")
+                logging.info(f"Author {author} creado")
 
 
 def compute_authors_h_index(override_metric=False):
@@ -164,3 +164,21 @@ def curate_authors_name():
             logging.info(f"Curating the name of the author {author['name']}")
             author_name = curate_author_name(author['name'])
             db_authors.update_record({'name': author['name']}, {'name': author_name})
+
+
+def compute_paper_base_url():
+    db_papers = DBManager('bioinfo_papers')
+    papers = db_papers.search({})
+    papers_list = [paper_db for paper_db in papers]
+    for paper in papers_list:
+        base_url = ''
+        slash_counter = 0
+        for c in paper['link']:
+            if c == '/':
+                slash_counter += 1
+            if slash_counter <= 2:
+                base_url += c
+            else:
+                break
+        logging.info(f"Paper full url {paper['link']}, base url {base_url}")
+        db_papers.update_record({'DOI': paper['DOI']}, {'base_url': base_url})
