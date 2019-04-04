@@ -8,7 +8,10 @@ Plos Computational Biology, Nucleic Acids Research, BMC bioinformatics, and BMC 
 2. Iterate over the articles' dois and get the url of the publications by using the Doi Resolution Service 
 (http://dx.doi.org/);  
 
-3. Iterate over the list of articles' urls and extract the authors and their affiliations;
+3. Iterate over the list of articles' urls and extract the authors and their affiliations. For the affiliation, we
+store the institution name exactly as it appears in the website of the article. In addition, we take the last word
+of the institution name and assume that it refers to the country where the institution is located. To cross-check if it is 
+actually a country name, we compare it against a list of 264 countries;
 
 4. For each author, get their gender by using the NamSor API (http://api.namsor.com/)
 
@@ -17,4 +20,6 @@ All of these data are stored in a MongoDB database
 ## Data Cleaning
 
 1. Curate the name of authors by removing non alpha characters, such as numbers, or starts, underscores, and commas.
+
+2. Remove duplicate authors from the database.
  
