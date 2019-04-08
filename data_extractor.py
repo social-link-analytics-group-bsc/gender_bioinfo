@@ -1,5 +1,4 @@
 import bs4
-import gender_guesser.detector as gender
 import logging
 import pathlib
 import random
@@ -8,8 +7,7 @@ import time
 
 from db_manager import DBManager
 from selenium import webdriver
-from hammock import Hammock as GendreAPI
-from utils import curate_author_name, curate_affiliation_name, load_countries_file
+from utils import curate_author_name, curate_affiliation_name, load_countries_file, get_gender
 
 
 logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gender_identification.log')),
@@ -18,16 +16,48 @@ logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gen
 
 ###
 # Class to extract the authors' affiliation from the
-# paper online publication
+# online publication of the papers
 ###
 class AuthorAffiliationExtractor:
     db_authors, db_papers = None, None
+    countries, driver = None, None
 
     def __init__(self):
         self.db_authors = DBManager('bioinfo_authors')
         self.db_papers = DBManager('bioinfo_papers')
+        self.countries = load_countries_file()
+        self.driver = webdriver.Chrome()
 
-    def update_author_affiliation_and_country(self, dict_authors, paper):
+    def __get_country_from_affiliation(self, affiliation):
+        found_countries = []
+        for country in self.countries['names']:
+            if country in affiliation:
+                found_countries.append(country)
+        if found_countries:
+            if len(found_countries) > 1:
+                logging.warning(f"Found more than one country in the affiliation {', '.join(found_countries)}")
+            return found_countries[0]
+        else:
+            return None
+
+    def __record_author_affiliation(self, affiliation, dict_authors, author_name):
+        curated_affiliation = curate_affiliation_name(affiliation)
+        if 'affiliations' not in dict_authors[author_name].keys():
+            dict_authors[author_name]['affiliations'] = [curated_affiliation]
+        else:
+            dict_authors[author_name]['affiliations'].append(curated_affiliation)
+        return curated_affiliation
+
+    def __record_affiliation_country(self, affiliation, dict_authors, author_name):
+        curated_affiliation = curate_affiliation_name(affiliation)
+        affiliation_country = self.__get_country_from_affiliation(curated_affiliation)
+        if affiliation_country:
+            if 'countries' not in dict_authors[author_name].keys():
+                dict_authors[author_name]['countries'] = [affiliation_country]
+            else:
+                dict_authors[author_name]['countries'].append(affiliation_country)
+
+    def __update_author_affiliation_and_country(self, dict_authors, paper):
         new_vals = {}
         for author_name, val in dict_authors.items():
             author_db = self.db_authors.find_record({'name': author_name})
@@ -57,11 +87,14 @@ class AuthorAffiliationExtractor:
                     'papers_as_first_author': 0,
                     'dois': [paper['DOI']],
                     'papers_with_citations': 0,
-                    'citations': [int(paper['citations'])]
+                    'citations': [int(paper['citations'])],
+                    'affiliations': val['affiliations'],
+                    'countries': val['countries']
                 }
                 self.db_authors.store_record(record_to_save)
 
-    def obtain_author_info_academic(self, html, countries, paper):
+    def __obtain_author_info_academic(self, paper):
+        html = self.driver.page_source
         soup = bs4.BeautifulSoup(html, 'html.parser')
         elements = soup.find_all(class_='info-card-author')
 
@@ -79,12 +112,13 @@ class AuthorAffiliationExtractor:
                                 if descendant.name != 'sup' and descendant != '\n':
                                     curated_affiliation = curate_affiliation_name(descendant)
                                     dict_authors[author_name]['affiliations'].append(curated_affiliation)
-                                    affiliation_country = get_country_from_string(countries, curated_affiliation)
+                                    affiliation_country = self.__get_country_from_affiliation(curated_affiliation)
                                     if affiliation_country:
                                         dict_authors[author_name]['countries'].append(affiliation_country)
-        self.update_author_affiliation_and_country(dict_authors, paper)
+        self.__update_author_affiliation_and_country(dict_authors, paper)
 
-    def obtain_author_info_nucleid(self, html, countries, paper):
+    def __obtain_author_info_nucleid(self, paper):
+        html = self.driver.page_source
         soup = bs4.BeautifulSoup(html, 'html.parser')
         # Get authors' names and superscripts
         authors = soup.find('div', class_='contrib-group fm-author').text.split(',')
@@ -113,29 +147,102 @@ class AuthorAffiliationExtractor:
                 for author_name, val in dict_authors.items():
                     if val['indexes']:
                         if index in val['indexes']:
-                            curated_affiliation = record_author_affiliation(affiliation, dict_authors, author_name)
-                            record_author_country(countries, curated_affiliation, dict_authors, author_name)
+                            curated_affiliation = self.__record_author_affiliation(affiliation, dict_authors,
+                                                                                   author_name)
+                            self.__record_affiliation_country(curated_affiliation, dict_authors, author_name)
                     else:
-                        curated_affiliation = record_author_affiliation(affiliation, dict_authors, author_name)
-                        record_author_country(countries, curated_affiliation, dict_authors, author_name)
+                        curated_affiliation = self.__record_author_affiliation(affiliation, dict_authors, author_name)
+                        self.__record_affiliation_country(curated_affiliation, dict_authors, author_name)
         # Update authors' information
-        self.update_author_affiliation_and_country(dict_authors, paper)
+        self.__update_author_affiliation_and_country(dict_authors, paper)
 
-    def obtain_author_info_plos(self, html, countries, paper):
-        pass
+    def __obtain_author_info_bmc(self, paper):
+        elements = self.driver.find_elements_by_class_name('AuthorName')
+        dict_authors = dict()
+        for element in elements:
+            author_name = element.text
+            dict_authors[author_name] = {'affiliations': [], 'countries': []}
+            element.click()
+            affs = self.driver.find_elements_by_class_name('tooltip-tether__indexed-item')
+            for aff in affs:
+                author_affiliation = curate_affiliation_name(aff.text)
+                dict_authors[author_name]['affiliations'].append(author_affiliation)
+                affiliation_country = self.__get_country_from_affiliation(author_affiliation)
+                dict_authors[author_name]['countries'].append(affiliation_country)
+        # Update authors' information
+        self.__update_author_affiliation_and_country(dict_authors, paper)
 
-    def do_obtain_affiliation(self, paper):
-        driver = webdriver.Chrome()
+    def __process_country_occurrence(self, affiliation, author_countries, enriched_country, country, countries):
+        # It might happen that the occurrence refers to city that has the same
+        # name of a country (e.g., Georgia), so I checked if the subsequent
+        # term in the affiliation is a country. If it is a country
+        # then I assume the occurrence is a city otherwise is a country
+        if enriched_country in affiliation:
+            idx_occurrence = affiliation.index(enriched_country)
+            len_country = len(enriched_country)
+            if idx_occurrence+len_country <= len(affiliation)-1:
+                subsequent_str = affiliation[idx_occurrence+len_country:].lstrip(',').rstrip(',').rstrip('\n').strip()
+            else:
+                subsequent_str = ''
+            if subsequent_str not in countries['names']:
+                num_occurances = affiliation.count(enriched_country)
+                for i in range(0, num_occurances):
+                    author_countries.append(country)
+                affiliation = affiliation.replace(enriched_country, '___')
+        return affiliation
+
+    def __obtain_author_info_plos(self, paper):
+        html = self.driver.page_source
+        soup = bs4.BeautifulSoup(html, 'html.parser')
+        elements = soup.find_all('li', {'data-js-tooltip': 'tooltip_trigger'})
         countries = load_countries_file()
+        regex_aff = re.compile(r'\bAffiliations?\b')
+        dict_authors = dict()
+        for element in elements:
+            author_name = curate_author_name(element.find('a', {'class': 'author-name'}).text)
+            dict_authors[author_name] = {'affiliations': [], 'countries': []}
+            raw_affiliation = element.find('p', {'id': re.compile('^authAffiliations-')}).text
+            raw_affiliation = regex_aff.sub('', raw_affiliation).strip()
+            raw_affiliation += '\n'
+            author_countries = []
+            for country in countries['names']:
+                # Look for the occurrences of country names in the text of the affiliation.
+                # To avoid mismatching the country names should be preceded by a comma and
+                # a white space and should end with a comma (match case 1) or
+                # newline character (match case 2).
+                #
+                # Match Case 1
+                enriched_country = ', ' + country + ','
+                raw_affiliation = self.__process_country_occurrence(raw_affiliation, author_countries,
+                                                                    enriched_country, country, countries)
+                # Match Case 2
+                enriched_country = ', ' + country + '\n'
+                raw_affiliation = self.__process_country_occurrence(raw_affiliation, author_countries,
+                                                                    enriched_country, country, countries)
+            author_affiliations = set()
+            for idx, aff in enumerate(raw_affiliation.split('___')):
+                curated_affiliation = curate_affiliation_name(aff)
+                if len(curated_affiliation) > 1:
+                    author_affiliations.add(curated_affiliation + ', ' + author_countries[idx])
+            dict_authors[author_name]['affiliations'] = list(author_affiliations)
+            dict_authors[author_name]['countries'] = list(set(author_countries))
+        # Update authors' information
+        self.__update_author_affiliation_and_country(dict_authors, paper)
 
+    def __do_obtain_affiliation(self, paper):
         logging.info(f"Obtaining affiliation of the author of the paper with DOI: {paper['DOI']}")
         if 'link' in paper.keys():
-            if 'academic.oup.com' in paper['link']:
-                driver.get(paper['link'])
-                self.obtain_author_info_academic(driver.page_source, countries, paper)
-            elif 'ncbi.nlm.nih.gov' in paper['link']:
-                driver.get(paper['link'])
-                self.obtain_author_info_nucleid(driver.page_source, countries, paper)
+            # self.driver.get(paper['link'])
+            self.driver.get('https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1003788')
+            if 'academic.oup.com' in paper['base_url']:
+                self.__obtain_author_info_academic(paper)
+            elif 'ncbi.nlm.nih.gov' in paper['base_url']:
+                self.__obtain_author_info_nucleid(paper)
+            elif 'bmcgenomics.biomedcentral.com' in paper['base_url'] or \
+                 'bmcbioinformatics.biomedcentral.com' in paper['base_url']:
+                self.__obtain_author_info_bmc(paper)
+            elif 'journals.plos.org' in paper['base_url']:
+                self.__obtain_author_info_plos(paper)
             else:
                 logging.warning(f"Unknown the domain name of the paper link {paper['link']}")
         else:
@@ -145,7 +252,7 @@ class AuthorAffiliationExtractor:
         papers = self.db_papers.search({'link': {'$exists': 1}})
 
         for paper in papers:
-            self.do_obtain_affiliation(paper)
+            self.__do_obtain_affiliation(paper)
 
     def obtain_affiliation_from_author(self):
         authors = self.db_authors.search({'affiliations': {'$exists': 0}})
@@ -154,9 +261,21 @@ class AuthorAffiliationExtractor:
             for doi in author['dois']:
                 paper = self.db_papers.find_record({'DOI': doi})
                 if paper:
-                    self.do_obtain_affiliation(paper)
+                    self.__do_obtain_affiliation(paper)
                 else:
                     logging.info(f"Could not find a paper with the doi {doi}")
+
+    def obtain_affiliation_from_papers_in_file(self):
+        with open(str('data/papers_without_links.txt'), 'r') as f:
+            for _, link in enumerate(f):
+                link = link.replace('\n', '')
+                if link == 'https://dx.doi.org/':
+                    continue
+                paper = self.db_papers.find_record({'link': link})
+                if paper:
+                    self.__do_obtain_affiliation(paper)
+                else:
+                    logging.info(f"Could not find a paper with the link {link}")
 
 
 def is_robot_page(driver):
@@ -264,25 +383,6 @@ def get_authors_ncbi_journal(db):
     return True
 
 
-def get_gender(full_name):
-    gendre_api = GendreAPI("http://api.namsor.com/onomastics/api/json/gendre")
-    gendre_api2 = gender.Detector(case_sensitive=False)
-
-    first_name = full_name.split()[0]
-    last_name = full_name.split()[-1]
-    resp = gendre_api(first_name, last_name).GET()
-    try:
-        author_gender = resp.json().get('gender')
-        if author_gender == 'unknown':
-            logging.info('Trying to get the author\'s gender using the second api')
-            # if the main api returns unknown gender, try with another api
-            author_gender = gendre_api2.get_gender(first_name)
-            author_gender = 'unknown' if author_gender == 'andy' else author_gender
-        return author_gender
-    except:
-        return 'error_api'
-
-
 def gender_id(article):
     genders = []
 
@@ -300,33 +400,6 @@ def obtain_author_gender(db):
         genders = gender_id(article)
         logging.info(f"Genders identified: {genders}")
         db.update_record({'DOI': article['DOI']}, {'authors_gender': genders})
-
-
-def get_country_from_string(countries, str):
-    for country in countries['names']:
-        for word in str.split(' '):
-            curated_word = word.replace(',', '').strip()
-            if curated_word.lower() == country.lower():
-                return country
-    return None
-
-
-def record_author_affiliation(affiliation, dict_authors, author_name):
-    curated_affiliation = curate_affiliation_name(affiliation)
-    if 'affiliations' not in dict_authors[author_name].keys():
-        dict_authors[author_name]['affiliations'] = [curated_affiliation]
-    else:
-        dict_authors[author_name]['affiliations'].append(curated_affiliation)
-    return curated_affiliation
-
-
-def record_author_country(countries, curated_affiliation, dict_authors, author_name):
-    affiliation_country = get_country_from_string(countries, curated_affiliation)
-    if affiliation_country:
-        if 'countries' not in dict_authors[author_name].keys():
-            dict_authors[author_name]['countries'] = [affiliation_country]
-        else:
-            dict_authors[author_name]['countries'].append(affiliation_country)
 
 
 def get_paper_links(db_papers):
@@ -387,12 +460,3 @@ def extract_data_untrackable_journals(db):
     list_DOI_nucleic_acids_research = [article['DOI'] for article in nucleic_bioinformatics]
     if len(list_DOI_nucleic_acids_research) > 0:
         get_authors_links_untrackable_journals(list_DOI_nucleic_acids_research, db)
-
-
-def get_authors_and_affiliation(db):
-    driver = webdriver.Chrome()
-    start = time.time()
-    # Collect the authors and their affiliations from papers published in bmc genomics
-    #bmc_genomics = db.search({'source': 'bmc genomics', 'authors': {'$exists': 0}})
-    paper = db.find_record({'link': 'https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-015-2339-x'})
-    process_article_page(paper['DOI'], driver, 0, start, db)
