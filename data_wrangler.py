@@ -1,12 +1,17 @@
-
 from db_manager import DBManager
-from utils import curate_author_name
+from googleapiclient.discovery import build
+from selenium import webdriver
+from utils import curate_author_name, get_config, get_base_url
 
+import bs4
 import logging
 import pathlib
 
 logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gender_identification.log')),
                     level=logging.DEBUG)
+logging.getLogger('selenium.webdriver.remote.remote_connection').setLevel(logging.ERROR)
+logging.getLogger('googleapiclient.discovery').setLevel(logging.ERROR)
+logging.getLogger('urllib3.connectionpool').setLevel(logging.ERROR)
 
 
 def create_update_paper_authors_collection(db_papers):
@@ -171,14 +176,58 @@ def compute_paper_base_url():
     papers = db_papers.search({})
     papers_list = [paper_db for paper_db in papers]
     for paper in papers_list:
-        base_url = ''
-        slash_counter = 0
-        for c in paper['link']:
-            if c == '/':
-                slash_counter += 1
-            if slash_counter <= 2:
-                base_url += c
-            else:
-                break
+        base_url = get_base_url(paper['link'])
         logging.info(f"Paper full url {paper['link']}, base url {base_url}")
         db_papers.update_record({'DOI': paper['DOI']}, {'base_url': base_url})
+
+
+def __update_with_ncbi_link(res_item, paper, driver, db_papers):
+    if res_item['title'].replace('...', '').lower() in paper['title'].lower():
+        driver.get(res_item['link'])
+        soup = bs4.BeautifulSoup(driver.page_source, 'html.parser')
+        h1s = soup.find_all('h1')
+        for h1 in h1s:
+            page_title = h1.text.rstrip('.')
+            if page_title.lower() == paper['title'].lower():
+                base_url = get_base_url(res_item['link'])
+                db_papers.update_record({'DOI': paper['DOI']},
+                                        {'source_link': paper['link'],
+                                         'link': res_item['link'],
+                                         'base_url': base_url})
+                return True
+        return False
+    else:
+        return False
+
+
+def search_ncbi_links():
+    current_dir = pathlib.Path(__file__).parents[0]
+    config_fn = current_dir.joinpath('config.json')
+    config = get_config(config_fn)
+    PMC_URL = 'https://www.ncbi.nlm.nih.gov/pmc'
+    PUBMED_URL = 'https://www.ncbi.nlm.nih.gov/pubmed'
+    db_papers = DBManager('bioinfo_papers')
+    papers = db_papers.search({'base_url': 'https://journals.plos.org', 'source_link': {'$exists': 0}})
+    papers_list = [paper_db for paper_db in papers]
+    records_to_update = len(papers_list)
+    driver = webdriver.Chrome()
+    updated_records = 0
+    service = build('customsearch', 'v1', developerKey=config['google_search']['key'], cache_discovery=False)
+    for paper in papers_list:
+        logging.info(f"Looking for the NCBI link of the paper {paper['DOI']}")
+        res = service.cse().list(q=paper['title'], cx=config['google_search']['cx']).execute()
+        res_items = res['items']
+        found_ncbi_link = False
+        for res_item in res_items:
+            if PMC_URL in res_item['link']:
+                found_ncbi_link = __update_with_ncbi_link(res_item, paper, driver, db_papers)
+        if not found_ncbi_link:
+            for res_item in res_items:
+                if PUBMED_URL in res_item['link']:
+                    found_ncbi_link = __update_with_ncbi_link(res_item, paper, driver, db_papers)
+        if found_ncbi_link:
+            logging.info(f"Updated the link of the paper {paper['DOI']}")
+            updated_records += 1
+        records_to_update -= 1
+        logging.info(f"Remaining {records_to_update} papers")
+    logging.info(f"It have been updated the links of {updated_records} papers")
