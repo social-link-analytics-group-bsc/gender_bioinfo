@@ -38,6 +38,9 @@ class DBManager:
         return self.__db[self.__collection].update_one(filter_query, {'$set': new_values},
                                                        upsert=create_if_doesnt_exist)
 
+    def remove_field_from_record(self, filter_query, fields_to_remove):
+        return self.__db[self.__collection].update_one(filter_query, {'$unset': fields_to_remove})
+
     def search(self, query):
         return self.__db[self.__collection].find(query, no_cursor_timeout=True)
 
