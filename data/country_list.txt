@@ -45,6 +45,7 @@ CF:Central African Republic
 TD:Chad
 CL:Chile
 CN:China
+CN:P. R. China
 CX:Christmas Island
 CC:Cocos [Keeling] Islands
 CO:Colombia
@@ -247,7 +248,7 @@ UA:Ukraine
 SU:Union of Soviet Socialist Republics
 AE:United Arab Emirates
 GB:United Kingdom
-US:United States
+US:United States of America
 ZZ:Unknown or Invalid Region
 UY:Uruguay
 UZ:Uzbekistan
