@@ -28,6 +28,7 @@ BA:Bosnia and Herzegovina
 BW:Botswana
 BV:Bouvet Island
 BR:Brazil
+BR:Brasil
 BQ:British Antarctic Territory
 IO:British Indian Ocean Territory
 VG:British Virgin Islands
@@ -46,6 +47,9 @@ TD:Chad
 CL:Chile
 CN:China
 CN:P. R. China
+CN:P.R. China
+CN:People's Republic of China
+CN:PR China
 CX:Christmas Island
 CC:Cocos [Keeling] Islands
 CO:Colombia
@@ -101,6 +105,7 @@ HT:Haiti
 HM:Heard Island and McDonald Islands
 HN:Honduras
 HK:Hong Kong SAR China
+HK:Hong Kong
 HU:Hungary
 IS:Iceland
 IN:India
@@ -145,6 +150,7 @@ MU:Mauritius
 YT:Mayotte
 FX:Metropolitan France
 MX:Mexico
+MX:México
 FM:Micronesia
 MI:Midway Islands
 MD:Moldova
@@ -159,6 +165,7 @@ NA:Namibia
 NR:Nauru
 NP:Nepal
 NL:Netherlands
+NL:The Netherlands
 AN:Netherlands Antilles
 NT:Neutral Zone
 NC:New Caledonia
@@ -215,12 +222,15 @@ SB:Solomon Islands
 SO:Somalia
 ZA:South Africa
 GS:South Georgia and the South Sandwich Islands
+KR:Korea
 KR:South Korea
+KR:Republic of Korea
 ES:Spain
 LK:Sri Lanka
 SD:Sudan
 SR:Suriname
 SJ:Svalbard and Jan Mayen
+ST:Scotland
 SZ:Swaziland
 SE:Sweden
 CH:Switzerland
@@ -248,6 +258,7 @@ UA:Ukraine
 SU:Union of Soviet Socialist Republics
 AE:United Arab Emirates
 GB:United Kingdom
+GB:United Kingom
 US:United States of America
 ZZ:Unknown or Invalid Region
 UY:Uruguay
@@ -263,3 +274,4 @@ YE:Yemen
 ZM:Zambia
 ZW:Zimbabwe
 AX:Åland Islands
+ES:España
