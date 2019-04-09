@@ -7,7 +7,7 @@ import time
 
 from db_manager import DBManager
 from selenium import webdriver
-from utils import curate_author_name, curate_affiliation_name, load_countries_file, get_gender
+from utils import curate_author_name, curate_affiliation_name, load_countries_file, get_gender, title_except
 
 
 logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gender_identification.log')),
@@ -173,7 +173,7 @@ class AuthorAffiliationExtractor:
         self.__update_author_affiliation_and_country(dict_authors, paper)
 
     def __process_country_occurrence(self, affiliation, author_countries, enriched_country, country, countries):
-        # It might happen that the occurrence refers to city that has the same
+        # It might happen that the occurrence refers to a city that has the same
         # name of a country (e.g., Georgia), so I checked if the subsequent
         # term in the affiliation is a country. If it is a country
         # then I assume the occurrence is a city otherwise is a country
@@ -184,10 +184,10 @@ class AuthorAffiliationExtractor:
                 subsequent_str = affiliation[idx_occurrence+len_country:].lstrip(',').rstrip(',').rstrip('\n').strip()
             else:
                 subsequent_str = ''
-            if subsequent_str not in countries['names']:
+            if title_except(subsequent_str) not in countries['names']:
                 num_occurances = affiliation.count(enriched_country)
                 for i in range(0, num_occurances):
-                    author_countries.append(country)
+                    author_countries.append(title_except(country))
                 affiliation = affiliation.replace(enriched_country, '___')
         return affiliation
 
@@ -204,8 +204,10 @@ class AuthorAffiliationExtractor:
             raw_affiliation = element.find('p', {'id': re.compile('^authAffiliations-')}).text
             raw_affiliation = regex_aff.sub('', raw_affiliation).strip()
             raw_affiliation += '\n'
+            raw_affiliation = raw_affiliation.lower()
             author_countries = []
             for country in countries['names']:
+                country = country.lower()
                 # Look for the occurrences of country names in the text of the affiliation.
                 # To avoid mismatching the country names should be preceded by a comma and
                 # a white space and should end with a comma (match case 1) or
@@ -221,7 +223,7 @@ class AuthorAffiliationExtractor:
                                                                     enriched_country, country, countries)
             author_affiliations = set()
             for idx, aff in enumerate(raw_affiliation.split('___')):
-                curated_affiliation = curate_affiliation_name(aff)
+                curated_affiliation = title_except(curate_affiliation_name(aff))
                 if len(curated_affiliation) > 1:
                     author_affiliations.add(curated_affiliation + ', ' + author_countries[idx])
             dict_authors[author_name]['affiliations'] = list(author_affiliations)
@@ -232,8 +234,7 @@ class AuthorAffiliationExtractor:
     def __do_obtain_affiliation(self, paper):
         logging.info(f"Obtaining affiliation of the author of the paper with DOI: {paper['DOI']}")
         if 'link' in paper.keys():
-            # self.driver.get(paper['link'])
-            self.driver.get('https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1003788')
+            self.driver.get(paper['link'])
             if 'academic.oup.com' in paper['base_url']:
                 self.__obtain_author_info_academic(paper)
             elif 'ncbi.nlm.nih.gov' in paper['base_url']:
