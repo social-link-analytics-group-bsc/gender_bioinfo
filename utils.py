@@ -20,7 +20,7 @@ def get_config(config_file):
 
 def curate_author_name(author_raw):
     regex = re.compile('[0-9*]')
-    return regex.sub('', author_raw).replace(' and ', ' ').strip().rstrip(',').lstrip(',')
+    return regex.sub('', author_raw).replace(' and ', ' ').rstrip(',').lstrip(',').strip()
 
 
 def curate_affiliation_name(affiliation_raw):
@@ -69,3 +69,11 @@ def get_base_url(full_url):
         else:
             break
     return base_url
+
+
+def title_except(str_to_title, exceptions=('a', 'an', 'of', 'the')):
+    word_list = re.split(' ', str_to_title)
+    final = [word_list[0].capitalize()]
+    for word in word_list[1:]:
+        final.append(word if word in exceptions else word.capitalize())
+    return " ".join(final)
