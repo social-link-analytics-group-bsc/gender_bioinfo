@@ -172,18 +172,29 @@ class AuthorAffiliationExtractor:
         # Update authors' information
         self.__update_author_affiliation_and_country(dict_authors, paper)
 
-    def __process_country_occurrence(self, affiliation, author_countries, enriched_country, country, countries):
+    def __get_subsequent_str(self, affiliation, enriched_country, char_to_find):
+        idx_occurrence = affiliation.index(enriched_country)
+        len_country = len(enriched_country)
+        idx_start_subsequent_str = idx_occurrence + len_country
+        if idx_start_subsequent_str <= len(affiliation) - 1:
+            rel_idx_end_subsequent_str = affiliation[idx_start_subsequent_str:].find(char_to_find)
+            if rel_idx_end_subsequent_str > -1:
+                idx_end_subsequent_str = idx_start_subsequent_str + rel_idx_end_subsequent_str
+                return affiliation[idx_start_subsequent_str:idx_end_subsequent_str]
+            else:
+                return ''
+        return ''
+
+    def __parse_affiliation(self, affiliation, author_countries, enriched_country, country, countries):
         # It might happen that the occurrence refers to a city that has the same
         # name of a country (e.g., Georgia), so I checked if the subsequent
         # term in the affiliation is a country. If it is a country
         # then I assume the occurrence is a city otherwise is a country
         if enriched_country in affiliation:
-            idx_occurrence = affiliation.index(enriched_country)
-            len_country = len(enriched_country)
-            if idx_occurrence+len_country <= len(affiliation)-1:
-                subsequent_str = affiliation[idx_occurrence+len_country:].lstrip(',').rstrip(',').rstrip('\n').strip()
-            else:
-                subsequent_str = ''
+            subsequent_str = self.__get_subsequent_str(affiliation, enriched_country, ',')
+            if not subsequent_str:
+                subsequent_str = self.__get_subsequent_str(affiliation, enriched_country, '\n')
+            subsequent_str = subsequent_str.lstrip(',').rstrip(',').rstrip('\n').strip()
             if title_except(subsequent_str) not in countries['names']:
                 num_occurances = affiliation.count(enriched_country)
                 for i in range(0, num_occurances):
@@ -203,6 +214,7 @@ class AuthorAffiliationExtractor:
             dict_authors[author_name] = {'affiliations': [], 'countries': []}
             raw_affiliation = element.find('p', {'id': re.compile('^authAffiliations-')}).text
             raw_affiliation = regex_aff.sub('', raw_affiliation).strip()
+            raw_affiliation = ' '.join(raw_affiliation.split())  # remove duplicate whitespaces and newline characters
             raw_affiliation += '\n'
             raw_affiliation = raw_affiliation.lower()
             author_countries = []
@@ -215,12 +227,12 @@ class AuthorAffiliationExtractor:
                 #
                 # Match Case 1
                 enriched_country = ', ' + country + ','
-                raw_affiliation = self.__process_country_occurrence(raw_affiliation, author_countries,
-                                                                    enriched_country, country, countries)
+                raw_affiliation = self.__parse_affiliation(raw_affiliation, author_countries,
+                                                           enriched_country, country, countries)
                 # Match Case 2
                 enriched_country = ', ' + country + '\n'
-                raw_affiliation = self.__process_country_occurrence(raw_affiliation, author_countries,
-                                                                    enriched_country, country, countries)
+                raw_affiliation = self.__parse_affiliation(raw_affiliation, author_countries,
+                                                           enriched_country, country, countries)
             author_affiliations = set()
             for idx, aff in enumerate(raw_affiliation.split('___')):
                 curated_affiliation = title_except(curate_affiliation_name(aff))
@@ -268,12 +280,15 @@ class AuthorAffiliationExtractor:
 
     def obtain_affiliation_from_papers_in_file(self):
         with open(str('data/papers_without_links.txt'), 'r') as f:
+            processed_links = 0
             for _, link in enumerate(f):
+                processed_links += 1
                 link = link.replace('\n', '')
                 if link == 'https://dx.doi.org/':
                     continue
                 paper = self.db_papers.find_record({'link': link})
                 if paper:
+                    logging.info(f"Processed Links: {processed_links}")
                     self.__do_obtain_affiliation(paper)
                 else:
                     logging.info(f"Could not find a paper with the link {link}")
