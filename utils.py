@@ -20,11 +20,15 @@ def get_config(config_file):
 
 def curate_author_name(author_raw):
     regex = re.compile('[0-9*]')
-    return regex.sub('', author_raw).replace(' and ', ' ').rstrip(',').lstrip(',').strip()
+    author_clean = regex.sub('', author_raw).replace(' and ', ' ').rstrip(',').lstrip(',')
+    author_clean = ' '.join(author_clean.split())  # remove duplicate whitespaces and newline characters
+    return author_clean
 
 
 def curate_affiliation_name(affiliation_raw):
-    return affiliation_raw.replace(' and ', ' ').rstrip(',').lstrip(',').rstrip('\t').lstrip('\t').strip()
+    affiliation_clean = affiliation_raw.replace(' and ', ' ').rstrip(',').lstrip(',').rstrip('\t').lstrip('\t')
+    affiliation_clean = ' '.join(affiliation_clean.split())  # remove duplicate whitespaces and newline characters
+    return affiliation_clean
 
 
 def load_countries_file():
