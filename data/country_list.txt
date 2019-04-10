@@ -50,6 +50,7 @@ CN:P. R. China
 CN:P.R. China
 CN:People's Republic of China
 CN:PR China
+CN:PR. China
 CX:Christmas Island
 CC:Cocos [Keeling] Islands
 CO:Colombia
@@ -185,11 +186,14 @@ PK:Pakistan
 PW:Palau
 PS:Palestinian Territories
 PA:Panama
+PA:Republic of Panama
+PA:República de Panamá
 PZ:Panama Canal Zone
 PG:Papua New Guinea
 PY:Paraguay
 YD:People's Democratic Republic of Yemen
 PE:Peru
+PE:Perú
 PH:Philippines
 PN:Pitcairn Islands
 PL:Poland
@@ -260,6 +264,8 @@ AE:United Arab Emirates
 GB:United Kingdom
 GB:United Kingom
 US:United States of America
+US:United States
+US:United States America
 ZZ:Unknown or Invalid Region
 UY:Uruguay
 UZ:Uzbekistan
