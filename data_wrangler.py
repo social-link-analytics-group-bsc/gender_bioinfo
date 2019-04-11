@@ -161,14 +161,10 @@ def curate_authors_name():
     db_authors = DBManager('bioinfo_authors')
     authors = db_authors.search({})
     authors_list = [author_db for author_db in authors]
-    found_last = False
     for author in authors_list:
-        if author['name'] == 'Josep A Calduch-Giner':
-            found_last = True
-        if found_last:
-            logging.info(f"Curating the name of the author {author['name']}")
-            author_name = curate_author_name(author['name'])
-            db_authors.update_record({'name': author['name']}, {'name': author_name})
+        logging.info(f"Curating the name of the author {author['name']}")
+        author_name = curate_author_name(author['name'])
+        db_authors.update_record({'name': author['name']}, {'name': author_name})
 
 
 def compute_paper_base_url():
