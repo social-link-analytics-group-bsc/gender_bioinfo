@@ -51,6 +51,7 @@ CN:P.R. China
 CN:People's Republic of China
 CN:PR China
 CN:PR. China
+CN:Republic of China
 CX:Christmas Island
 CC:Cocos [Keeling] Islands
 CO:Colombia
@@ -202,6 +203,7 @@ PR:Puerto Rico
 QA:Qatar
 RO:Romania
 RU:Russia
+RU:Russian Federation
 RW:Rwanda
 RE:Réunion
 BL:Saint Barthélemy
@@ -214,6 +216,7 @@ VC:Saint Vincent and the Grenadines
 WS:Samoa
 SM:San Marino
 SA:Saudi Arabia
+SA:Kingdom of Saudi Arabia
 SN:Senegal
 RS:Serbia
 CS:Serbia and Montenegro
