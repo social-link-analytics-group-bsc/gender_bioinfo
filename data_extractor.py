@@ -185,21 +185,21 @@ class AuthorAffiliationExtractor:
                 return ''
         return ''
 
-    def __parse_affiliation(self, affiliation, author_countries, enriched_country, country, countries):
+    def __parse_affiliation(self, affiliation, author_countries, match_pattern, country, countries):
         # It might happen that the occurrence refers to a city that has the same
         # name of a country (e.g., Georgia), so I checked if the subsequent
         # term in the affiliation is a country. If it is a country
         # then I assume the occurrence is a city otherwise is a country
-        if enriched_country in affiliation:
-            subsequent_str = self.__get_subsequent_str(affiliation, enriched_country, ',')
+        if match_pattern in affiliation:
+            subsequent_str = self.__get_subsequent_str(affiliation, match_pattern, ',')
             if not subsequent_str:
-                subsequent_str = self.__get_subsequent_str(affiliation, enriched_country, '\n')
+                subsequent_str = self.__get_subsequent_str(affiliation, match_pattern, '\n')
             subsequent_str = subsequent_str.lstrip(',').rstrip(',').rstrip('\n').strip()
             if title_except(subsequent_str) not in countries['names']:
-                num_occurances = affiliation.count(enriched_country)
+                num_occurances = affiliation.count(match_pattern)
                 for i in range(0, num_occurances):
                     author_countries.append(title_except(country))
-                affiliation = affiliation.replace(enriched_country, '___')
+                affiliation = affiliation.replace(match_pattern, '___')
         return affiliation
 
     def __obtain_author_info_plos(self, paper):
@@ -221,18 +221,24 @@ class AuthorAffiliationExtractor:
             for country in countries['names']:
                 country = country.lower()
                 # Look for the occurrences of country names in the text of the affiliation.
-                # To avoid mismatching the country names should be preceded by a comma and
-                # a white space and should end with a comma (match case 1) or
+                # To avoid mismatching the country names should be preceded by a comma or semicolon
+                # and a white space and should end with a comma (match case 1) or
                 # newline character (match case 2).
                 #
                 # Match Case 1
-                enriched_country = ', ' + country + ','
+                match_case_1_comma = ', ' + country + ','
                 raw_affiliation = self.__parse_affiliation(raw_affiliation, author_countries,
-                                                           enriched_country, country, countries)
+                                                           match_case_1_comma, country, countries)
+                match_case_1_semicolon = '; ' + country + ','
+                raw_affiliation = self.__parse_affiliation(raw_affiliation, author_countries,
+                                                           match_case_1_semicolon, country, countries)
                 # Match Case 2
-                enriched_country = ', ' + country + '\n'
+                match_case_2_comma = ', ' + country + '\n'
                 raw_affiliation = self.__parse_affiliation(raw_affiliation, author_countries,
-                                                           enriched_country, country, countries)
+                                                           match_case_2_comma, country, countries)
+                match_case_2_semicolon = '; ' + country + '\n'
+                raw_affiliation = self.__parse_affiliation(raw_affiliation, author_countries,
+                                                           match_case_2_semicolon, country, countries)
             author_affiliations = set()
             for idx, aff in enumerate(raw_affiliation.split('___')):
                 curated_affiliation = title_except(curate_affiliation_name(aff))
@@ -279,8 +285,9 @@ class AuthorAffiliationExtractor:
                     logging.info(f"Could not find a paper with the doi {doi}")
 
     def obtain_affiliation_from_papers_in_file(self):
+        file_counter = 39
+        processed_links = 0
         with open(str('data/papers_without_links.txt'), 'r') as f:
-            processed_links = 0
             for _, link in enumerate(f):
                 processed_links += 1
                 link = link.replace('\n', '')
@@ -289,7 +296,14 @@ class AuthorAffiliationExtractor:
                 paper = self.db_papers.find_record({'link': link})
                 if paper:
                     logging.info(f"Processed Links: {processed_links}")
-                    self.__do_obtain_affiliation(paper)
+                    try:
+                        self.__do_obtain_affiliation(paper)
+                    except Exception as e:
+                        logging.error(e)
+                        file_counter += 1
+                        with open('data/unprocessed_articles.txt', 'a', encoding='utf-8') as f:
+                            f.write(f"{file_counter}- {link}")
+                            f.write('\n')
                 else:
                     logging.info(f"Could not find a paper with the link {link}")
 
@@ -401,7 +415,6 @@ def get_authors_ncbi_journal(db):
 
 def gender_id(article):
     genders = []
-
     for person in article['authors']:
         author_gender = get_gender(person)
         genders.append(author_gender)
