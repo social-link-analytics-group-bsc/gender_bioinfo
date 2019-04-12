@@ -1,7 +1,7 @@
 from db_manager import DBManager
 from googleapiclient.discovery import build
 from selenium import webdriver
-from utils import curate_author_name, get_config, get_base_url
+from utils import curate_author_name, get_config, get_base_url, load_countries_file
 
 import bs4
 import logging
@@ -227,3 +227,25 @@ def search_ncbi_links():
         records_to_update -= 1
         logging.info(f"Remaining {records_to_update} papers")
     logging.info(f"It have been updated the links of {updated_records} papers")
+
+
+def curate_author_affiliation_country():
+    db_authors = DBManager('bioinfo_authors')
+    authors = db_authors.search({})
+    authors_list = [author for author in authors]
+    total_authors = len(authors_list)
+    countries = load_countries_file()
+    for author in authors_list:
+        logging.info(f"Curating the country and affiliation of the author: {author['name']}")
+        author_dict = {'affiliations': [], 'countries': []}
+        for affiliation in author['affiliations']:
+            affiliation_country = affiliation.split(',')[-1].strip()
+            if affiliation_country in countries['names']:
+                author_dict['countries'].append(affiliation_country)
+                author_dict['affiliations'].append(affiliation)
+            else:
+                logging.info(f"[AUTHOR CURATE]: Affiliation discarded because could not find "
+                             f"its country {affiliation}")
+        db_authors.update_record({'name': author['name']}, author_dict)
+        total_authors -= 1
+        logging.info(f"Remaining authors {total_authors}")
