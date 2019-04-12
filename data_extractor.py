@@ -31,7 +31,8 @@ class AuthorAffiliationExtractor:
     def __get_country_from_affiliation(self, affiliation):
         found_countries = []
         for country in self.countries['names']:
-            if country in affiliation:
+            regex_country = re.compile(f", {country}$")
+            if regex_country.search(affiliation):
                 found_countries.append(country)
         if found_countries:
             if len(found_countries) > 1:
@@ -166,9 +167,12 @@ class AuthorAffiliationExtractor:
             affs = self.driver.find_elements_by_class_name('tooltip-tether__indexed-item')
             for aff in affs:
                 author_affiliation = curate_affiliation_name(aff.text)
-                dict_authors[author_name]['affiliations'].append(author_affiliation)
                 affiliation_country = self.__get_country_from_affiliation(author_affiliation)
-                dict_authors[author_name]['countries'].append(affiliation_country)
+                if affiliation_country:
+                    dict_authors[author_name]['countries'].append(affiliation_country)
+                    dict_authors[author_name]['affiliations'].append(author_affiliation)
+                else:
+                    raise Exception(f"Affiliation discarded, could not find its country {author_affiliation}")
         # Update authors' information
         self.__update_author_affiliation_and_country(dict_authors, paper)
 
@@ -284,10 +288,10 @@ class AuthorAffiliationExtractor:
                 else:
                     logging.info(f"Could not find a paper with the doi {doi}")
 
-    def obtain_affiliation_from_papers_in_file(self):
-        file_counter = 39
+    def obtain_affiliation_from_papers_in_file(self, filename):
+        file_counter = 89
         processed_links = 0
-        with open(str('data/papers_without_links.txt'), 'r') as f:
+        with open(str(filename), 'r') as f:
             for _, link in enumerate(f):
                 processed_links += 1
                 link = link.replace('\n', '')
@@ -302,7 +306,7 @@ class AuthorAffiliationExtractor:
                         logging.error(e)
                         file_counter += 1
                         with open('data/unprocessed_articles.txt', 'a', encoding='utf-8') as f:
-                            f.write(f"{file_counter}- {link}")
+                            f.write(f"{file_counter}- {link} ({e})")
                             f.write('\n')
                 else:
                     logging.info(f"Could not find a paper with the link {link}")
