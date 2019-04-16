@@ -41,6 +41,9 @@ class DBManager:
     def remove_field_from_record(self, filter_query, fields_to_remove):
         return self.__db[self.__collection].update_one(filter_query, {'$unset': fields_to_remove})
 
+    def remove_field_from_all_records(self, fields_to_remove):
+        return self.__db[self.__collection].update_many({}, {'$unset': fields_to_remove})
+
     def search(self, query):
         return self.__db[self.__collection].find(query, no_cursor_timeout=True)
 
