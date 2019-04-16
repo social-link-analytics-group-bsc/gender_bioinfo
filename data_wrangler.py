@@ -34,23 +34,41 @@ def create_author_record(author_name, author_gender, author_index, article, db_a
 
 
 def update_author_record(author_in_db, author_name, author_index, author_gender, article, db_authors):
-    author_in_db['dois'].append(article['DOI'])
-    author_in_db['citations'].append(int(article['citations']))
+    if 'dois' in author_in_db.keys():
+        author_in_db['dois'].append(article['DOI'])
+        author_dois = author_in_db['dois']
+    else:
+        author_dois = [article['DOI']]
+    if 'citations' in author_in_db.keys():
+        author_in_db['citations'].append(int(article['citations']))
+        author_citations = author_in_db['citations']
+    else:
+        author_citations = [int(article['citations'])]
+    if 'total_citations' in author_in_db.keys():
+        total_citations = author_in_db['total_citations'] + int(article['citations'])
+    else:
+        total_citations = int(article['citations'])
     values_to_update = {
-        'papers': author_in_db['papers'] + 1,
-        'total_citations': author_in_db['total_citations'] + int(article['citations']),
-        'dois': author_in_db['dois'],
-        'citations': author_in_db['citations']
+        'papers': author_in_db['papers'] + 1 if 'papers' in author_in_db.keys() else 1,
+        'total_citations': total_citations,
+        'dois': author_dois,
+        'citations': author_citations
     }
     if author_index == 0:
-        values_to_update['papers_as_first_author'] = author_in_db['papers_as_first_author'] + 1
+        if 'papers_as_first_author' in author_in_db.keys():
+            values_to_update['papers_as_first_author'] = author_in_db['papers_as_first_author'] + 1
+        else:
+            values_to_update['papers_as_first_author'] = 1
     # check if the stored gender of the author is unknown, if
     # this is the case replace with the current one
     if author_in_db['gender'] == 'unknown':
         values_to_update['gender'] = author_gender
     if int(article['citations']) > 0:
-        values_to_update['papers_with_citations'] = author_in_db['papers_with_citations'] + 1
-    if author_gender != 'unknown' and author_gender != author_in_db['gender']:
+        if 'papers_with_citations' in author_in_db.keys():
+            values_to_update['papers_with_citations'] = author_in_db['papers_with_citations'] + 1
+        else:
+            values_to_update['papers_with_citations'] = 1
+    if author_gender != 'unknown' and 'gender' in author_in_db.keys() and author_gender != author_in_db['gender']:
         logging.warning(f"Author {author_name}'s with gender inconsistency. "
                         f"Stored {author_in_db['gender']}. Article (doi {article['DOI']}) author_gender")
     db_authors.update_record({'name': author_name}, values_to_update)
