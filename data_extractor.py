@@ -569,47 +569,74 @@ def get_paper_authors_from_pubmed(remove_author_field_from_records=False):
     end_chunk = BATCH_SIZE
     authors_list = set()
     for chunk in range(0, total_chuncks):
-        logging.info(f"Getting information from the chunk {chunk+1} of papers. {BATCH_SIZE} papers in the chunk.")
-        results = ec.fetch_in_bulk_from_list(pm_ids[start_chunk:end_chunk])
-        # Process results
-        for result in results:
-            pm_id = result['MedlineCitation']['PMID']
-            paper = db_papers.find_record({'pubmed_id': pm_id})
-            article_meta_data = result['MedlineCitation']['Article']
-            logging.info(f"Processing paper {article_meta_data['ArticleTitle']} (PMID: {pm_id})")
-            authors = article_meta_data['AuthorList']
-            paper_authors, gender_authors = [], []
-            for index, author in enumerate(authors):
-                if 'ForeName' in author.keys():
-                    author_name = author['ForeName'] + ' ' + author['LastName']
-                    author_db = db_authors.find_record({'name': author_name})
-                    if author_db:
-                        paper_authors.append(author_name)
-                        if 'gender' not in author_db.keys():
-                            author_gender = get_gender(author_name)
-                            update_author_record(author_db, author_name, index, author_gender, paper, db_authors)
-                        else:
-                            author_gender = author_db['gender']
-                        gender_authors.append(author_gender)
-                    else:
-                        author_gender = get_gender(author_name)
-                        create_author_record(author_name, author_gender, index, paper, db_authors)
-                    affiliations = []
-                    # Update author's affiliations
-                    for affiliation in author['AffiliationInfo']:
-                        aff_list = [curate_affiliation_name(aff) for aff in affiliation['Affiliation'].split(';')]
-                        affiliations.extend(aff_list)
-                    if author_name in authors_list:
-                        existing_affiliations = author_db['affiliations']
-                        existing_affiliations.extend(affiliations)
-                        db_authors.update_record({'name': author_name},
-                                                 {'affiliations': list(set(existing_affiliations))})
-                    else:
-                        db_authors.update_record({'name': author_name}, {'affiliations': affiliations})
-                        authors_list.add(author_name)
-            # Update paper's authors
-            db_papers.update_record({'pubmed_id': pm_id}, {'authors': paper_authors, 'authors_gender': gender_authors})
-        # Update indexes
-        start_chunk += end_chunk
-        end_chunk += BATCH_SIZE
+        try:
+            logging.info(f"Getting information from the chunk {chunk + 1} of papers. {BATCH_SIZE} papers in the chunk.")
+            results = ec.fetch_in_bulk_from_list(pm_ids[start_chunk:end_chunk])
+            # Process results
+            for result in results:
+                pm_id = result['MedlineCitation']['PMID']
+                article_meta_data = result['MedlineCitation']['Article']
+                if 'AuthorList' in article_meta_data.keys():
+                    paper = db_papers.find_record({'pubmed_id': pm_id})
+                    logging.info(f"Processing paper {article_meta_data['ArticleTitle']} (PMID: {pm_id})")
+                    authors = article_meta_data['AuthorList']
+                    paper_authors, gender_authors = [], []
+                    for index, author in enumerate(authors):
+                        if 'ForeName' in author.keys() and len(author['AffiliationInfo']) > 0:
+                            author_name = author['ForeName'] + ' ' + author['LastName']
+                            author_db = db_authors.find_record({'name': author_name})
+                            if author_db:
+                                if 'gender' not in author_db.keys():
+                                    author_gender = get_gender(author_name)
+                                    update_author_record(author_db, author_name, index, author_gender, paper, db_authors)
+                                else:
+                                    author_gender = author_db['gender']
+                                if author_name not in paper_authors:
+                                    paper_authors.append(author_name)
+                                    gender_authors.append(author_gender)
+                            else:
+                                author_gender = get_gender(author_name)
+                                create_author_record(author_name, author_gender, index, paper, db_authors)
+                            affiliations = []
+                            # Update author's affiliations
+                            for affiliation in author['AffiliationInfo']:
+                                aff_list = [curate_affiliation_name(aff) for aff in affiliation['Affiliation'].split(';')]
+                                affiliations.extend(aff_list)
+                            if author_name in authors_list:
+                                existing_affiliations = author_db['affiliations']
+                                existing_affiliations.extend(affiliations)
+                                db_authors.update_record({'name': author_name},
+                                                         {'affiliations': list(set(existing_affiliations))})
+                            else:
+                                db_authors.update_record({'name': author_name}, {'affiliations': affiliations})
+                                authors_list.add(author_name)
+                    # Update paper's authors
+                    db_papers.update_record({'pubmed_id': pm_id}, {'authors': paper_authors,
+                                                                   'authors_gender': gender_authors})
+            # Update indexes
+            start_chunk = end_chunk
+            end_chunk += BATCH_SIZE
+            time.sleep(1)
+        except Exception as e:
+            logging.error(e)
+
+
+def get_pubmed_id_from_doi():
+    ec = EntrezClient()
+    db_papers = DBManager('bioinfo_papers')
+    papers_without_pmid = db_papers.search({'pubmed_id': {'$exists': 0},'authors': {'$exists': 0}})
+    papers = [paper_without_pmid for paper_without_pmid in papers_without_pmid]
+    total_papers = len(papers)
+    paper_counter = 0
+    for paper in papers:
+        paper_counter += 1
+        logging.info(f"Searching the pubmed id of the paper {paper['DOI']} ({paper_counter}/{total_papers})")
+        results = ec.search(f"{paper['DOI']}[DOI]")
+        if int(results['Count']) == 1:
+            logging.info(f"Found it on the pubmed database!, getting its id")
+            paper_e = ec.fetch_in_bulk_from_list(results['IdList'][0])
+            pubmed_id = paper_e[0]['MedlineCitation']['PMID']
+            db_papers.update_record({'DOI': paper['DOI']}, {'pubmed_id': pubmed_id})
+        elif int(results['Count']) > 1:
+            raise Exception(f"Found more than one paper with the doi {paper['DOI']}")
         time.sleep(1)
