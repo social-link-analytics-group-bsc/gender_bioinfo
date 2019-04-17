@@ -61,16 +61,16 @@ def update_author_record(author_in_db, author_name, author_index, author_gender,
             values_to_update['papers_as_first_author'] = 1
     # check if the stored gender of the author is unknown, if
     # this is the case replace with the current one
-    if author_in_db['gender'] == 'unknown':
+    if author_in_db.get('gender') == 'unknown':
         values_to_update['gender'] = author_gender
     if int(article['citations']) > 0:
         if 'papers_with_citations' in author_in_db.keys():
             values_to_update['papers_with_citations'] = author_in_db['papers_with_citations'] + 1
         else:
             values_to_update['papers_with_citations'] = 1
-    if author_gender != 'unknown' and 'gender' in author_in_db.keys() and author_gender != author_in_db['gender']:
+    if author_gender != 'unknown' and author_gender != author_in_db.get('gender'):
         logging.warning(f"Author {author_name}'s with gender inconsistency. "
-                        f"Stored {author_in_db['gender']}. Article (doi {article['DOI']}) author_gender")
+                        f"Stored {author_in_db.get('gender')}. Article (doi {article['DOI']}) author_gender")
     db_authors.update_record({'name': author_name}, values_to_update)
     logging.info(f"Actualizado author {author_name}")
 
