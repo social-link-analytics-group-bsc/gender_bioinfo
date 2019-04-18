@@ -4,13 +4,15 @@ import logging
 import pathlib
 import random
 import re
+import requests
 import time
 
 from data_wrangler import create_author_record, update_author_record
 from db_manager import DBManager
 from pubmed import EntrezClient
 from selenium import webdriver
-from utils import curate_author_name, curate_affiliation_name, load_countries_file, get_gender, title_except, get_config
+from utils import curate_author_name, curate_affiliation_name, load_countries_file, get_gender, title_except, get_config, \
+                  get_base_url
 from urllib import parse, request
 
 
@@ -552,6 +554,7 @@ def obtain_pmid_from_doi():
 
 
 def get_paper_authors_from_pubmed(remove_author_field_from_records=False):
+    PMC_URL = 'https://www.ncbi.nlm.nih.gov/pmc/articles/'
     ec = EntrezClient()
     db_papers = DBManager('bioinfo_papers')
     db_authors = DBManager('bioinfo_authors')
@@ -562,15 +565,15 @@ def get_paper_authors_from_pubmed(remove_author_field_from_records=False):
     pm_ids = []
     for paper in papers:
         pm_ids.append(paper['pubmed_id'])
-    BATCH_SIZE = 600
     total_ids = len(pm_ids)
-    total_chuncks = int(round(total_ids/BATCH_SIZE,0))
+    batch_size = 600 if total_ids > 600 else total_ids
+    total_chuncks = int(round(total_ids/batch_size,0))
     start_chunk = 0
-    end_chunk = BATCH_SIZE
+    end_chunk = batch_size
     authors_list = set()
     for chunk in range(0, total_chuncks):
         try:
-            logging.info(f"Getting information from the chunk {chunk + 1} of papers. {BATCH_SIZE} papers in the chunk.")
+            logging.info(f"Getting information from the chunk {chunk + 1} of papers. {batch_size} papers in the chunk.")
             results = ec.fetch_in_bulk_from_list(pm_ids[start_chunk:end_chunk])
             # Process results
             for result in results:
@@ -613,9 +616,21 @@ def get_paper_authors_from_pubmed(remove_author_field_from_records=False):
                     # Update paper's authors
                     db_papers.update_record({'pubmed_id': pm_id}, {'authors': paper_authors,
                                                                    'authors_gender': gender_authors})
+                else:
+                    if result['PubmedData'].get('ArticleIdList'):
+                        for other_id in result['PubmedData']['ArticleIdList']:
+                            if 'pmc' in other_id.attributes.values():
+                                logging.info(f"Updating the link of the paper pubmed_id={pm_id}")
+                                pmc_id = other_id.title().upper()
+                                pmc_link = PMC_URL + str(pmc_id) + '/'
+                                r = requests.get(pmc_link)
+                                if r.status_code == 200:
+                                    db_papers.update_record({'pubmed_id': pm_id}, {'link': pmc_link,
+                                                                                   'base_url': get_base_url(pmc_link)})
+
             # Update indexes
             start_chunk = end_chunk
-            end_chunk += BATCH_SIZE
+            end_chunk += batch_size
             time.sleep(1)
         except Exception as e:
             logging.error(e)
