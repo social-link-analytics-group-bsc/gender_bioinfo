@@ -8,7 +8,7 @@ import pathlib
 import time
 
 
-logging.basicConfig(filename=str(pathlib.Path(__file__).parents[1].joinpath('impact_app.log')),
+logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gender_identification.log')),
                     level=logging.DEBUG)
 
 
@@ -21,13 +21,13 @@ class EntrezClient:
         self.__entrez.email = config_file['pubmed']['email']
         self.__entrez.api_key = config_file['pubmed']['api_key']
 
-    def search(self, query, db='pubmed', use_history=True):
+    def search(self, query, db='pubmed', use_history=True, batch_size=20):
         if use_history:
             handle = self.__entrez.esearch(db=db, sort='relevance', retmode='xml',
-                                           usehistory='y', term=query)
+                                           usehistory='y', term=query, retmax=batch_size)
         else:
             handle = self.__entrez.esearch(db=db, sort='relevance', retmode='xml',
-                                           term=query)
+                                           term=query, retmax=batch_size)
         results = self.__entrez.read(handle)
         handle.close()
         return results
@@ -109,9 +109,9 @@ class EntrezClient:
 #if __name__ == '__main__':
     # ec = EntrezClient()
     # db = 'pubmed'
-    #res = ec.fetch_in_bulk_from_list(['25927095'])
-    # results = ec.search('10.1093/nar/gnj006[DOI]', db=db, use_history=True)
+    # results = ec.search('10.1093/bioinformatics/btu533[DOI]', db=db)
     # results = ec.search('10.1371/journal.pcbi.1002834[DOI]', db=db)
     # paper = ec.fetch_in_batch_from_history(results['Count'], results['WebEnv'], results['QueryKey'], db='pmc')
     # id_to_search = results['IdList'][0]
     # paper = ec.fetch_in_bulk_from_list([id_to_search], db=db)
+    # print('Done!')
