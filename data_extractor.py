@@ -624,19 +624,62 @@ def get_paper_authors_from_pubmed(remove_author_field_from_records=False):
 def get_pubmed_id_from_doi():
     ec = EntrezClient()
     db_papers = DBManager('bioinfo_papers')
-    papers_without_pmid = db_papers.search({'pubmed_id': {'$exists': 0},'authors': {'$exists': 0}})
+    papers_without_pmid = db_papers.search({'authors': {'$exists': 0}})
     papers = [paper_without_pmid for paper_without_pmid in papers_without_pmid]
-    total_papers = len(papers)
     paper_counter = 0
+    papers_with_pmid = 0
+    num_papers_without_pmid = 0
+    BATCH_SIZE = 10
+    doi_list = []
+    updated_papers = []
+    doi_requested = []
+    logging.info(f"Getting the pubmed id of {len(papers)} papers")
     for paper in papers:
         paper_counter += 1
-        logging.info(f"Searching the pubmed id of the paper {paper['DOI']} ({paper_counter}/{total_papers})")
-        results = ec.search(f"{paper['DOI']}[DOI]")
-        if int(results['Count']) == 1:
-            logging.info(f"Found it on the pubmed database!, getting its id")
-            paper_e = ec.fetch_in_bulk_from_list(results['IdList'][0])
-            pubmed_id = paper_e[0]['MedlineCitation']['PMID']
-            db_papers.update_record({'DOI': paper['DOI']}, {'pubmed_id': pubmed_id})
-        elif int(results['Count']) > 1:
-            raise Exception(f"Found more than one paper with the doi {paper['DOI']}")
-        time.sleep(1)
+        doi_list.append('"' + paper['DOI'] + '"[doi]')
+        doi_requested.append(paper['DOI'])
+        if len(doi_list) < BATCH_SIZE:
+            continue
+        query_term = ' OR '.join(doi_list)
+        try:
+            logging.info(f"Searching the pubmed id of {len(doi_list)} papers")
+            results = ec.search(query_term)
+            if int(results['Count']) > 0:
+                logging.info(f"Getting pubmed ids of {results['Count']} papers")
+                papers_e = ec.fetch_in_batch_from_history(results['Count'], results['WebEnv'], results['QueryKey'],
+                                                          batch_size=BATCH_SIZE)
+                papers_with_pmid += len(papers_e)
+                for paper_e in papers_e:
+                    pubmed_id, paper_doi = None, None
+                    # Getting the pubmed id of the paper
+                    if paper_e['MedlineCitation'].get('PMID'):
+                        pubmed_id = paper_e['MedlineCitation']['PMID']
+                    # Getting the doi of the paper
+                    if paper_e['PubmedData'].get('ArticleIdList'):
+                        for other_id in paper_e['PubmedData']['ArticleIdList']:
+                            if 'doi' in other_id.attributes.values():
+                                paper_doi = other_id.title().lower()
+                    if pubmed_id and paper_doi:
+                        if paper_doi not in doi_requested:
+                            logging.error(f"Obtained the doi {paper_doi}, which was not requested!")
+                        else:
+                            logging.info(f"Updating paper {paper_doi}")
+                            if paper_doi not in updated_papers:
+                                db_papers.update_record({'DOI': paper_doi}, {'pubmed_id': pubmed_id})
+                                updated_papers.append(paper_doi)
+                            else:
+                                logging.error(f"Trying to update the paper {paper_doi} that was already updated before")
+                    else:
+                        logging.warning(f"Could not find the doi {paper_doi} or pubmed id {pubmed_id}")
+            else:
+                num_papers_without_pmid += len(doi_list)
+            doi_list = []
+            doi_requested = []
+            time.sleep(2)
+        except Exception as e:
+            logging.error(e)
+            raise Exception(e)
+    logging.info(f"Final Report------------------------\n"
+                 f"- Processed papers: {paper_counter}\n"
+                 f"- Papers without pubmed id: {paper_counter-papers_with_pmid}\n"
+                 f"- Papers with new pubmed id: {papers_with_pmid}")
