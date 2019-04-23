@@ -69,8 +69,15 @@ class AuthorAffiliationExtractor:
 
     def __update_author_affiliation_and_country(self, dict_authors, paper):
         new_vals = {}
+        authors, authors_gender = [], []
         for author_name, val in dict_authors.items():
             author_db = self.db_authors.find_record({'name': author_name})
+            authors.append(author_name)
+            if author_db and 'gender' in author_db.keys():
+                author_gender = author_db['gender']
+            else:
+                author_gender = get_gender(author_name)
+            authors_gender.append(author_gender)
             if author_db:
                 if 'countries' in val.keys():
                     if 'countries' not in author_db.keys():
@@ -91,17 +98,19 @@ class AuthorAffiliationExtractor:
             else:
                 record_to_save = {
                     'name': author_name,
-                    'gender': get_gender(author_name),
+                    'gender': author_gender,
                     'papers': 1,
                     'total_citations': int(paper['citations']),
                     'papers_as_first_author': 0,
                     'dois': [paper['DOI']],
-                    'papers_with_citations': 0,
+                    'papers_with_citations': 1 if int(paper['citations']) > 0 else 0,
                     'citations': [int(paper['citations'])],
                     'affiliations': val['affiliations'],
                     'countries': val['countries']
                 }
                 self.db_authors.store_record(record_to_save)
+        if 'authors' not in paper.keys():
+            self.db_papers.update_record({'DOI': paper['DOI']}, {'authors': authors, 'authors_gender': authors_gender})
 
     def __obtain_author_info_academic(self, paper):
         html = self.driver.page_source
@@ -120,14 +129,14 @@ class AuthorAffiliationExtractor:
                         if 'info-card-affilitation' in child.attrs['class']:
                             for descendant in child.children:
                                 if descendant.name != 'sup' and descendant != '\n':
-                                    curated_affiliation = curate_affiliation_name(descendant)
+                                    curated_affiliation = curate_affiliation_name(descendant.text)
                                     dict_authors[author_name]['affiliations'].append(curated_affiliation)
                                     affiliation_country = self.__get_country_from_affiliation(curated_affiliation)
                                     if affiliation_country:
                                         dict_authors[author_name]['countries'].append(affiliation_country)
         self.__update_author_affiliation_and_country(dict_authors, paper)
 
-    def __obtain_author_info_nucleid(self, paper):
+    def __obtain_author_info_ncbi(self, paper):
         html = self.driver.page_source
         soup = bs4.BeautifulSoup(html, 'html.parser')
         # Get authors' names and superscripts
@@ -169,9 +178,9 @@ class AuthorAffiliationExtractor:
     def __obtain_author_info_bmc(self, paper):
         elements = self.driver.find_elements_by_class_name('AuthorName')
         dict_authors = dict()
-        for element in elements:
+        for index, element in enumerate(elements):
             author_name = element.text
-            dict_authors[author_name] = {'affiliations': [], 'countries': []}
+            dict_authors[author_name] = {'affiliations': [], 'countries': [], 'index': index}
             element.click()
             affs = self.driver.find_elements_by_class_name('tooltip-tether__indexed-item')
             for aff in affs:
@@ -181,7 +190,7 @@ class AuthorAffiliationExtractor:
                     dict_authors[author_name]['countries'].append(affiliation_country)
                     dict_authors[author_name]['affiliations'].append(author_affiliation)
                 else:
-                    raise Exception(f"Affiliation discarded, could not find its country {author_affiliation}")
+                    logging.warning(f"Affiliation discarded, could not find its country {author_affiliation}")
         # Update authors' information
         self.__update_author_affiliation_and_country(dict_authors, paper)
 
@@ -269,7 +278,7 @@ class AuthorAffiliationExtractor:
             if 'academic.oup.com' in paper['base_url']:
                 self.__obtain_author_info_academic(paper)
             elif 'ncbi.nlm.nih.gov' in paper['base_url']:
-                self.__obtain_author_info_nucleid(paper)
+                self.__obtain_author_info_ncbi(paper)
             elif 'bmcgenomics.biomedcentral.com' in paper['base_url'] or \
                  'bmcbioinformatics.biomedcentral.com' in paper['base_url']:
                 self.__obtain_author_info_bmc(paper)
@@ -280,10 +289,13 @@ class AuthorAffiliationExtractor:
         else:
             logging.error(f"Paper with doi {paper['DOI']} does not have a link")
 
-    def obtain_author_affiliation_from_paper(self):
-        papers = self.db_papers.search({'link': {'$exists': 1}})
-
+    def obtain_author_affiliation_from_paper(self, query):
+        papers_db = self.db_papers.search(query)
+        papers = [paper_db for paper_db in papers_db]
+        logging.info(f"Going to process {len(papers)} papers")
         for paper in papers:
+            if paper['link'] == 'https://dx.doi.org/':
+                continue
             self.__do_obtain_affiliation(paper)
 
     def obtain_affiliation_from_author(self):
@@ -298,7 +310,7 @@ class AuthorAffiliationExtractor:
                     logging.info(f"Could not find a paper with the doi {doi}")
 
     def obtain_affiliation_from_papers_in_file(self, filename):
-        file_counter = 89
+        file_counter = 0
         processed_links = 0
         with open(str(filename), 'r') as f:
             for _, link in enumerate(f):
@@ -504,7 +516,7 @@ def extract_data_untrackable_journals(db):
         get_authors_links_untrackable_journals(list_DOI_nucleic_acids_research, db)
 
 
-def obtain_pmid_from_doi():
+def convert_dois_to_pubmed_ids():
     logging.info("Getting the pubmed id of papers...")
     URL = 'https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/?'
     BATCH_SIZE = 200
@@ -585,33 +597,37 @@ def get_paper_authors_from_pubmed(remove_author_field_from_records=False):
                     authors = article_meta_data['AuthorList']
                     paper_authors, gender_authors = [], []
                     for index, author in enumerate(authors):
-                        if 'ForeName' in author.keys() and len(author['AffiliationInfo']) > 0:
+                        if 'ForeName' in author.keys():
                             author_name = author['ForeName'] + ' ' + author['LastName']
                             author_db = db_authors.find_record({'name': author_name})
                             if author_db:
                                 if 'gender' not in author_db.keys():
                                     author_gender = get_gender(author_name)
-                                    update_author_record(author_db, author_name, index, author_gender, paper, db_authors)
                                 else:
                                     author_gender = author_db['gender']
-                                if author_name not in paper_authors:
-                                    paper_authors.append(author_name)
-                                    gender_authors.append(author_gender)
+                                # If author exists, update their record
+                                update_author_record(author_db, author_name, index, author_gender, paper, db_authors)
                             else:
                                 author_gender = get_gender(author_name)
+                                # if author doesn't exist, create a record
                                 create_author_record(author_name, author_gender, index, paper, db_authors)
-                            affiliations = []
-                            # Update author's affiliations
-                            for affiliation in author['AffiliationInfo']:
-                                aff_list = [curate_affiliation_name(aff) for aff in affiliation['Affiliation'].split(';')]
-                                affiliations.extend(aff_list)
-                            if author_name in authors_list:
-                                existing_affiliations = author_db['affiliations']
-                                existing_affiliations.extend(affiliations)
-                                db_authors.update_record({'name': author_name},
-                                                         {'affiliations': list(set(existing_affiliations))})
-                            else:
-                                db_authors.update_record({'name': author_name}, {'affiliations': affiliations})
+                            # Add author and they gender to the arrays of author names and genders
+                            if author_name not in paper_authors:
+                                paper_authors.append(author_name)
+                                gender_authors.append(author_gender)
+                            if len(author['AffiliationInfo']) > 0:
+                                affiliations = []
+                                # Update author's affiliations
+                                for affiliation in author['AffiliationInfo']:
+                                    aff_list = [curate_affiliation_name(aff) for aff in affiliation['Affiliation'].split(';')]
+                                    affiliations.extend(aff_list)
+                                if author_name in authors_list:
+                                    existing_affiliations = author_db['affiliations']
+                                    existing_affiliations.extend(affiliations)
+                                    db_authors.update_record({'name': author_name},
+                                                             {'affiliations': list(set(existing_affiliations))})
+                                else:
+                                    db_authors.update_record({'name': author_name}, {'affiliations': affiliations})
                                 authors_list.add(author_name)
                     # Update paper's authors
                     db_papers.update_record({'pubmed_id': pm_id}, {'authors': paper_authors,
