@@ -1,7 +1,7 @@
 from db_manager import DBManager
 from googleapiclient.discovery import build
 from selenium import webdriver
-from utils import curate_author_name, get_config, get_base_url, load_countries_file
+from utils import curate_author_name, get_config, get_base_url, load_countries_file, get_gender
 
 import bs4
 import logging
@@ -20,15 +20,11 @@ def create_author_record(author_name, author_gender, author_index, article, db_a
         'gender': author_gender,
         'papers': 1,
         'total_citations': int(article['citations']),
-        'papers_as_first_author': 0,
+        'papers_as_first_author': 1 if author_index == 0 else 0,
         'dois': [article['DOI']],
-        'papers_with_citations': 0,
+        'papers_with_citations': 1 if int(article['citations']) > 0 else 0,
         'citations': [int(article['citations'])]
     }
-    if author_index == 0:
-        record_to_save['papers_as_first_author'] += 1
-    if int(article['citations']) > 0:
-        record_to_save['papers_with_citations'] += 1
     db_authors.save_record(record_to_save)
     logging.info(f"Author {author_name} creado")
 
@@ -59,15 +55,15 @@ def update_author_record(author_in_db, author_name, author_index, author_gender,
             values_to_update['papers_as_first_author'] = author_in_db['papers_as_first_author'] + 1
         else:
             values_to_update['papers_as_first_author'] = 1
-    # check if the stored gender of the author is unknown, if
-    # this is the case replace with the current one
-    if author_in_db.get('gender') == 'unknown':
-        values_to_update['gender'] = author_gender
     if int(article['citations']) > 0:
         if 'papers_with_citations' in author_in_db.keys():
             values_to_update['papers_with_citations'] = author_in_db['papers_with_citations'] + 1
         else:
             values_to_update['papers_with_citations'] = 1
+    # check if the stored gender of the author is unknown, if
+    # this is the case replace with the current one
+    if author_in_db.get('gender') == 'unknown':
+        values_to_update['gender'] = author_gender
     if author_gender != 'unknown' and author_gender != author_in_db.get('gender'):
         logging.warning(f"Author {author_name}'s with gender inconsistency. "
                         f"Stored {author_in_db.get('gender')}. Article (doi {article['DOI']}) author_gender")
@@ -75,7 +71,8 @@ def update_author_record(author_in_db, author_name, author_index, author_gender,
     logging.info(f"Actualizado author {author_name}")
 
 
-def create_update_paper_authors_collection(db_papers):
+def create_update_paper_authors_collection():
+    db_papers = DBManager('bioinfo_papers')
     db_authors = DBManager('bioinfo_authors')
 
     articles = db_papers.search({})
@@ -98,6 +95,44 @@ def create_update_paper_authors_collection(db_papers):
                 update_author_record(author_in_db, author, index, author_gender, article, db_authors)
             else:
                 create_author_record(author, author_gender, index, article, db_authors)
+
+
+def update_author_metrics():
+    """
+    Update the authors' metrics: papers with citations and papers as first author
+    :return:
+    """
+    db_authors = DBManager('bioinfo_authors')
+    db_papers = DBManager('bioinfo_papers')
+    authors_db = db_authors.search({})
+    authors = [author_db for author_db in authors_db]
+    processed_authors = []
+    total_authors = len(authors)
+    for num_author, author in enumerate(authors):
+        logging.info(f"Processing author: {author['name']} ({num_author+1}/{total_authors})")
+        for doi in author['dois']:
+            paper_db = db_papers.find_record({'DOI': doi})
+            if paper_db:
+                index = paper_db['authors'].index(author['name'])
+                if author['name'] not in processed_authors:
+                    # First time
+                    processed_authors.append(author['name'])
+                    new_vals = {
+                        'papers_with_citations': 1 if int(paper_db['citations']) > 0 else 0,
+                        'papers_as_first_author': 1 if index == 0 else 0
+                    }
+                else:
+                    papers_with_citations = author['papers_with_citations']
+                    if int(paper_db['citations']) > 0:
+                        papers_with_citations += 1
+                    papers_as_first_author = author['papers_as_first_author']
+                    if index == 0:
+                        papers_as_first_author += + 1
+                    new_vals = {
+                        'papers_with_citations': papers_with_citations,
+                        'papers_as_first_author': papers_as_first_author
+                    }
+                db_authors.update_record({'name': author['name']}, new_vals)
 
 
 def compute_authors_h_index(override_metric=False):
@@ -275,3 +310,26 @@ def curate_author_affiliation_country():
         db_authors.update_record({'name': author['name']}, author_dict)
         total_authors -= 1
         logging.info(f"Remaining authors {total_authors}")
+
+
+def complete_author_genders():
+    db_papers = DBManager('bioinfo_papers')
+    db_authors = DBManager('bioinfo_authors')
+    papers_db = db_papers.search({'authors': {'$exists': 1}, 'authors_gender': {'$exists': 0},
+                                  'link': {'$ne': 'https://dx.doi.org/'}})
+    papers = [paper_db for paper_db in papers_db]
+    for paper in papers:
+        authors = paper['authors']
+        author_genders = []
+        for index, author in enumerate(authors):
+            author_db = db_authors.find_record({'name': author})
+            if author_db:
+                if 'gender' in author_db.keys():
+                    author_genders.append(author_db['gender'])
+                else:
+                    author_genders.append(get_gender(author))
+            else:
+                author_gender = get_gender(author)
+                author_genders.append(author_gender)
+                create_author_record(author, author_gender, index, paper, db_authors)
+        db_papers.update_record({'DOI': paper['DOI']}, {'authors_gender': author_genders})
