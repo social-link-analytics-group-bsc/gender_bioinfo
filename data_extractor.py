@@ -116,7 +116,6 @@ class AuthorAffiliationExtractor:
         html = self.driver.page_source
         soup = bs4.BeautifulSoup(html, 'html.parser')
         elements = soup.find_all(class_='info-card-author')
-
         dict_authors = dict()
         author_name = None
         for element in elements:
@@ -127,51 +126,47 @@ class AuthorAffiliationExtractor:
                             author_name = curate_author_name(child.text)
                             dict_authors[author_name] = {'affiliations': [], 'countries': []}
                         if 'info-card-affilitation' in child.attrs['class']:
-                            for descendant in child.children:
-                                if descendant.name != 'sup' and descendant != '\n':
-                                    curated_affiliation = curate_affiliation_name(descendant.text)
-                                    dict_authors[author_name]['affiliations'].append(curated_affiliation)
-                                    affiliation_country = self.__get_country_from_affiliation(curated_affiliation)
-                                    if affiliation_country:
-                                        dict_authors[author_name]['countries'].append(affiliation_country)
+                            for descendant in child.contents:
+                                if descendant != '\n':
+                                    for content in descendant.contents:
+                                        if isinstance(content, bs4.element.NavigableString):
+                                            curated_affiliation = curate_affiliation_name(content)
+                                            dict_authors[author_name]['affiliations'].append(curated_affiliation)
+                                            affiliation_country = self.__get_country_from_affiliation(curated_affiliation)
+                                            if affiliation_country:
+                                                dict_authors[author_name]['countries'].append(affiliation_country)
         self.__update_author_affiliation_and_country(dict_authors, paper)
 
     def __obtain_author_info_ncbi(self, paper):
         html = self.driver.page_source
         soup = bs4.BeautifulSoup(html, 'html.parser')
-        # Get authors' names and superscripts
-        authors = soup.find('div', class_='contrib-group fm-author').text.split(',')
-        c_author = authors[0].strip()
         dict_authors = dict()
-        author_indexes = []
-        for author in authors[1: len(authors)]:
-            if author.isdigit():
-                author_indexes.append(author)
-                continue
-            if author[0].isdigit():
-                author_indexes.append(author[0])
-            dict_authors[c_author] = {'indexes': author_indexes.copy()}
-            c_author = curate_author_name(author)
-            author_indexes.clear()
-        if c_author and c_author not in dict_authors.keys():
-            dict_authors[curate_author_name(c_author)] = {'indexes': author_indexes.copy()}
+        # Get authors' names and superscripts
+        elements = list(soup.find('div', class_='contrib-group fm-author').children)
+        for element in elements:
+            if element.name == 'a':
+                c_author = curate_author_name(element.text)
+                dict_authors[c_author] = {'indexes': []}
+            if element.name == 'sup':
+                author_index = curate_affiliation_name(element.text)
+                if author_index.isdigit():
+                    dict_authors[c_author]['indexes'].append(author_index)
         # Get authors' affiliations
-        author_affiliations = list(soup.find('div', class_='fm-affl').children)
+        author_affiliations = list(soup.find_all('div', class_='fm-affl'))
         index = '0'
         for affiliation in author_affiliations:
-            if 'sup' == affiliation.name:
-                index = affiliation.text
-                continue
-            else:
-                for author_name, val in dict_authors.items():
-                    if val['indexes']:
-                        if index in val['indexes']:
-                            curated_affiliation = self.__record_author_affiliation(affiliation, dict_authors,
-                                                                                   author_name)
-                            self.__record_affiliation_country(curated_affiliation, dict_authors, author_name)
-                    else:
-                        curated_affiliation = self.__record_author_affiliation(affiliation, dict_authors, author_name)
-                        self.__record_affiliation_country(curated_affiliation, dict_authors, author_name)
+            aff_children = list(affiliation.children)
+            for aff_child in aff_children:
+                if 'sup' == aff_child.name:
+                    index = aff_child.text
+                    continue
+                else:
+                    for author_name, val in dict_authors.items():
+                        if val['indexes']:
+                            if index in val['indexes']:
+                                curated_affiliation = self.__record_author_affiliation(aff_child, dict_authors,
+                                                                                       author_name)
+                                self.__record_affiliation_country(curated_affiliation, dict_authors, author_name)
         # Update authors' information
         self.__update_author_affiliation_and_country(dict_authors, paper)
 
