@@ -26,8 +26,14 @@ def curate_author_name(author_raw):
 
 
 def curate_affiliation_name(affiliation_raw):
-    affiliation_clean = affiliation_raw.replace(' and ', ' ').rstrip(',').lstrip(',').rstrip('\t').lstrip('\t').\
-        rstrip('.')
+    affiliation_raw = str(affiliation_raw)
+    affiliation_clean = affiliation_raw.replace(' and ', ' ')
+    affiliation_clean = affiliation_clean.strip()
+    affiliation_clean = affiliation_clean.rstrip(',')
+    affiliation_clean = affiliation_clean.lstrip(',')
+    affiliation_clean = affiliation_clean.rstrip('\t')
+    affiliation_clean = affiliation_clean.lstrip('\t')
+    affiliation_clean = affiliation_clean.rstrip('.')
     affiliation_clean = ' '.join(affiliation_clean.split())  # remove duplicate whitespaces and newline characters
     return affiliation_clean
 
