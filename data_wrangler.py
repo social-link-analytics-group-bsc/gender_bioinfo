@@ -333,3 +333,18 @@ def complete_author_genders():
                 author_genders.append(author_gender)
                 create_author_record(author, author_gender, index, paper, db_authors)
         db_papers.update_record({'DOI': paper['DOI']}, {'authors_gender': author_genders})
+
+
+def fix_gender():
+    """
+    There are some genders that are named mostly_female or mostly_male, which should
+    be converted to female and male, respectively
+    """
+    db_authors = DBManager('bioinfo_authors')
+    authors_db = db_authors.search({'$or': [{'gender': 'mostly_male'}, {'gender': 'mostly_female'}]})
+    authors = [author_db for author_db in authors_db]
+    for author in authors:
+        if author['gender'] == 'mostly_female':
+            db_authors.update_record({'_id': author['_id']}, {'gender': 'female'})
+        elif author['gender'] == 'mostly_male':
+            db_authors.update_record({'_id': author['_id']}, {'gender': 'male'})
