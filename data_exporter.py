@@ -14,9 +14,13 @@ def export_db_into_file(filename_to_export, db, fields_to_export):
     fn = current_dir.joinpath('data', filename_to_export)
     logging.info('Exporting data, please wait...')
     with open(str(fn), 'w', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=fields_to_export)
+        headers = ['id']
+        headers.extend(fields_to_export)
+        writer = csv.DictWriter(f, fieldnames=headers)
         writer.writeheader()
+        record_counter = 0
         for record in records:
+            record_counter += 1
             record_to_save = dict()
             for key, value in record.items():
                 if key in fields_to_export:
@@ -25,4 +29,5 @@ def export_db_into_file(filename_to_export, db, fields_to_export):
                         record_to_save[key] = countries
                     else:
                         record_to_save[key] = value
+            record_to_save['id'] = record_counter
             writer.writerow(record_to_save)
