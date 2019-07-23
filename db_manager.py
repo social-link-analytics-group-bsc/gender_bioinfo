@@ -65,5 +65,53 @@ class DBManager:
             logging.info(f"Found record duplicated. Identifier: {record_identifier}")
             return False
 
+    def get_papers_by_year(self):
+        group = {
+            '_id': '$year',
+            'num_papers': {
+                '$sum': 1
+            }
+        }
+        project = {
+            'year': '$_id',
+            'count': '$num_papers',
+            '_id': 0
+        }
+        sort = {
+            'year': 1
+        }
+        pipeline = [
+            {'$group': group},
+            {'$project': project},
+            {'$sort': sort}
+        ]
+        result_docs = self.aggregate(pipeline)
+        return result_docs
+
+    def get_average_citations_by_year(self):
+        group = {
+            '_id': '$year',
+            'avg_citations': {
+                '$avg': {
+                    '$toInt': '$citations'
+                }
+            }
+        }
+        project = {
+            'year': '$_id',
+            'avg_citations': '$avg_citations',
+            '_id': 0
+        }
+        sort = {
+            'year': 1
+        }
+        pipeline = [
+            {'$group': group},
+            {'$project': project},
+            {'$sort': sort}
+        ]
+        result_docs = self.aggregate(pipeline)
+        return result_docs
+
     def aggregate(self, pipeline):
         return [doc for doc in self.__db[self.__collection].aggregate(pipeline, allowDiskUse=True)]
