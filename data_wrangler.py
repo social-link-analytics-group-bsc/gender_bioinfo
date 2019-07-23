@@ -1,6 +1,7 @@
 from collections import defaultdict
 from db_manager import DBManager
 from googleapiclient.discovery import build
+from recordlinkage import preprocessing, SortedNeighbourhoodIndex, Compare
 from selenium import webdriver
 from utils import curate_author_name, get_config, get_base_url, load_countries_file, get_gender
 
@@ -9,6 +10,8 @@ import bs4
 import logging
 import pathlib
 import pprint
+import pandas as pd
+
 
 logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gender_identification.log')),
                     level=logging.DEBUG)
@@ -360,7 +363,7 @@ def fix_gender():
 
 def remove_author_duplicates():
     db_authors = DBManager('bioinfo_authors')
-    with open('data/duplicates.csv', 'r', encoding='ISO-8859-1') as f:
+    with open('data/duplicates.csv', 'r', encoding='utf-8') as f:
         file = csv.DictReader(f, delimiter=',')
         duplicates = defaultdict(list)
         for line in file:
@@ -370,82 +373,134 @@ def remove_author_duplicates():
         if len(dup_array) == 2:
             two_duplicates[cluster] = dup_array
     processed_clusters = []
+    # read processed duplicates
+    last_cluster = None
+    with open('data/processed_duplicates.csv', 'r') as f:
+        file = csv.DictReader(f, delimiter=',')
+        for line in file:
+            last_cluster = line['cluster']
     try:
         dup_counter = 0
         total_dup = len(two_duplicates)
+        found_last = False
         for cluster, dup_array in two_duplicates.items():
             dup_counter += 1
-            print(f"\n\nProcessing {dup_counter}/{total_dup}")
-            authors = []
-            for duplicate in dup_array:
-                pprint.pprint(duplicate)
-                author_db = db_authors.find_record({'name': duplicate['name'], 'gender': duplicate['gender']})
-                authors.append(author_db)
-                if duplicate['name'] == 'Robert Becker':
-                    print('Here!')
-            # ask the user if the cluster actually contains
-            # a duplicate
             processed_clusters.append(cluster)
-            is_duplicate = str(input('\nDoes the cluster contain a duplicate? yes (y)/no (n) '))
-            if is_duplicate == 'y':
-                logging.info('Creating a new record to merge the duplicates')
-                merged_author = dict()
-                # Getting name
-                name_chosen = int(input(f"Which name do you want to take "
-                                        f"(1) {authors[0]['name']}/"
-                                        f"(2) {authors[1]['name']}?"))
-                if name_chosen == 1:
-                    merged_author['name'] = authors[0]['name']
-                else:
-                    merged_author['name'] = authors[1]['name']
-                # Getting gender
-                if authors[0]['gender'] == authors[1]['gender']:
-                    merged_author['gender'] = authors[0]['gender']
-                else:
-                    if authors[0]['gender'] == 'unknown' and authors[1]['gender'] in ['male', 'female']:
-                        merged_author['gender'] = authors[1]['gender']
-                    elif authors[1]['gender'] == 'unknown' and authors[0]['gender'] in ['male', 'female']:
+            print(f"\n\nProcessing {dup_counter}/{total_dup}")
+            if cluster == last_cluster:
+                found_last = True
+            if found_last:
+                authors = []
+                for duplicate in dup_array:
+                    pprint.pprint(duplicate)
+                    author_db = db_authors.find_record({'name': duplicate['name'], 'gender': duplicate['gender']})
+                    authors.append(author_db)
+                # ask the user if the cluster actually contains
+                # a duplicate
+                is_duplicate = str(input('\nDoes the cluster contain a duplicate? yes (y)/no (n) '))
+                if is_duplicate == 'y':
+                    logging.info('Creating a new record to merge the duplicates')
+                    merged_author = dict()
+                    # Getting name
+                    name_chosen = int(input(f"Which name do you want to take "
+                                            f"(1) {authors[0]['name']}/"
+                                            f"(2) {authors[1]['name']}?"))
+                    if name_chosen == 1:
+                        merged_author['name'] = authors[0]['name']
+                    else:
+                        merged_author['name'] = authors[1]['name']
+                    # Getting gender
+                    if authors[0]['gender'] == authors[1]['gender']:
                         merged_author['gender'] = authors[0]['gender']
                     else:
-                        gender_chosen = int(input(f"Which gender do you want to consider "
-                                                  f"(1) {authors[0]['gender']}/"
-                                                  f"(2) {authors[1]['gender']}?"))
-                        if gender_chosen == 1:
+                        if authors[0]['gender'] == 'unknown' and authors[1]['gender'] in ['male', 'female']:
+                            merged_author['gender'] = authors[1]['gender']
+                        elif authors[1]['gender'] == 'unknown' and authors[0]['gender'] in ['male', 'female']:
                             merged_author['gender'] = authors[0]['gender']
                         else:
-                            merged_author['gender'] = authors[1]['gender']
-                # Getting papers
-                merged_author['papers'] = authors[0]['papers'] + authors[1]['papers']
-                # Getting total citations
-                merged_author['total_citations'] = authors[0]['total_citations'] + authors[1]['total_citations']
-                # Getting papers as first author
-                merged_author['papers_as_first_author'] = authors[0]['papers_as_first_author'] + \
-                                                          authors[1]['papers_as_first_author']
-                # Getting papers with citations
-                merged_author['papers_with_citations'] = authors[0]['papers_with_citations'] + \
-                                                         authors[1]['papers_with_citations']
-                # Getting dois and their citations
-                merged_author['dois'] = authors[0]['dois']
-                merged_author['citations'] = authors[0]['citations']
-                for index, doi in enumerate(authors[1]['dois']):
-                    if doi not in merged_author['dois']:
-                        merged_author['dois'].append(doi)
-                        merged_author['citations'].append(authors[1]['citations'][index])
-                # Getting affiliations
-                aff_set = set()
-                for author in authors:
-                    if 'affiliations' in author.keys():
-                        for affiliation in author['affiliations']:
-                            aff_set.add(affiliation)
-                merged_author['affiliations'] = list(aff_set)
-                merged_author['h-index'] = do_compute_h_index(merged_author)
-                db_authors.store_record(merged_author)
-                logging.info('Removing duplicates')
-                db_authors.remove_record({'_id': authors[0]['_id']})
-                db_authors.remove_record({'_id': authors[1]['_id']})
+                            gender_chosen = int(input(f"Which gender do you want to consider "
+                                                      f"(1) {authors[0]['gender']}/"
+                                                      f"(2) {authors[1]['gender']}?"))
+                            if gender_chosen == 1:
+                                merged_author['gender'] = authors[0]['gender']
+                            else:
+                                merged_author['gender'] = authors[1]['gender']
+                    # Getting papers
+                    merged_author['papers'] = authors[0]['papers'] + authors[1]['papers']
+                    # Getting total citations
+                    merged_author['total_citations'] = authors[0]['total_citations'] + authors[1]['total_citations']
+                    # Getting papers as first author
+                    merged_author['papers_as_first_author'] = authors[0]['papers_as_first_author'] + \
+                                                              authors[1]['papers_as_first_author']
+                    # Getting papers with citations
+                    merged_author['papers_with_citations'] = authors[0]['papers_with_citations'] + \
+                                                             authors[1]['papers_with_citations']
+                    # Getting dois and their citations
+                    merged_author['dois'] = authors[0]['dois']
+                    merged_author['citations'] = authors[0]['citations']
+                    for index, doi in enumerate(authors[1]['dois']):
+                        if doi not in merged_author['dois']:
+                            merged_author['dois'].append(doi)
+                            merged_author['citations'].append(authors[1]['citations'][index])
+                    # Getting affiliations
+                    aff_set = set()
+                    for author in authors:
+                        if 'affiliations' in author.keys():
+                            for affiliation in author['affiliations']:
+                                aff_set.add(affiliation)
+                    merged_author['affiliations'] = list(aff_set)
+                    merged_author['h-index'] = do_compute_h_index(merged_author)
+                    db_authors.store_record(merged_author)
+                    logging.info('Removing duplicates')
+                    db_authors.remove_record({'_id': authors[0]['_id']})
+                    db_authors.remove_record({'_id': authors[1]['_id']})
     except:
         with open('data/processed_duplicates.csv', 'w', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=['cluster'])
             writer.writeheader()
             for processed_cluster in processed_clusters:
                 writer.writerow({'cluster': processed_cluster})
+
+
+def record_linkage():
+    db_authors = DBManager('bioinfo_authors')
+    authors_db = db_authors.search({})
+    authors = []
+    for author_db in authors_db:
+        # 1. Cleaning the author's name
+        s_author = pd.Series(author_db['name'])
+        clean_author = preprocessing.clean(s_author, strip_accents='unicode')
+        author_str = clean_author.to_string(header=False, index=False).strip()
+        author_str_arr = author_str.split()
+        authors.append(
+            {
+                'first_name': ' '.join(author_str_arr[:len(author_str_arr)-1]),
+                'last_name': author_str_arr[-1],
+                'sex': author_db['gender']
+            }
+        )
+    # 2. Indexing
+    indexer = SortedNeighbourhoodIndex('last_name', window=9)
+    authors_pd = pd.DataFrame(authors)
+    candidate_links = indexer.index(authors_pd)
+    # 3. Comparing
+    compare_cl = Compare()
+    compare_cl.string('first_name', 'first_name', method='jarowinkler', threshold=0.95, label='first_name')
+    compare_cl.string('last_name', 'last_name', method='jarowinkler', threshold=0.85, label='last_name')
+    compare_cl.exact('sex', 'sex', label='sex')
+    features = compare_cl.compute(candidate_links, authors_pd)
+    duplicates = features[features.sum(axis=1) > 2]
+    dup_df = pd.DataFrame(columns=['1_first_name', '1_last_name', '1_sex', '2_first_name', '2_last_name', '2_sex'])
+    for i in range(0, len(duplicates)):
+        columns_dup1 = ['1_' + col_name for col_name in list(authors_pd.loc[duplicates.iloc[i].name[0]].index)]
+        dup1 = pd.DataFrame([authors_pd.loc[duplicates.iloc[i].name[0]]],
+                            columns=list(authors_pd.loc[duplicates.iloc[i].name[0]].index),
+                            index=[i])
+        dup1.columns = columns_dup1
+        columns_dup2 = ['2_' + col_name for col_name in list(authors_pd.loc[duplicates.iloc[i].name[1]].index)]
+        dup2 = pd.DataFrame([authors_pd.loc[duplicates.iloc[i].name[1]]],
+                            columns=list(authors_pd.loc[duplicates.iloc[i].name[1]].index),
+                            index=[i])
+        dup2.columns = columns_dup2
+        dup_df = dup_df.append(pd.concat([dup1, dup2], axis=1), ignore_index=True)
+    dup_df.to_csv('data/potential_duplicates.csv', index=False)
