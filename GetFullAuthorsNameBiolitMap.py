@@ -164,10 +164,6 @@ def collect_links_and_authors_untrackable_journals(cwd, foundations_data):
     list_DOI_oxford_bioinformatics = list(foundations_data[foundations_data['source'] == 'oxford bioinformatics']['DOI'])
     links_oxford_bioinformatics= get_links_untrackable(list_DOI_oxford_bioinformatics)
 
-    # with open('/home/bsclife018/Desktop/BSC/links_oxford_bioinformatics.txt', 'w') as file_handler:
-    #    for item in links_oxford_bioinformatics:
-    #        file_handler.write("{}\n".format(item))
-
     # Get DOIs
     list_DOI_nucleic_acids_research = list(foundations_data[foundations_data['source'] ==
                                                             'nucleic acids research']['DOI'])
