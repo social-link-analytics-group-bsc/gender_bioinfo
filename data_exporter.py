@@ -3,6 +3,7 @@ import csv
 import logging
 import pathlib
 
+from db_manager import DBManager
 
 logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gender_identification.log')),
                     level=logging.DEBUG)
@@ -27,7 +28,37 @@ def export_db_into_file(filename_to_export, db, fields_to_export):
                     if key == 'countries':
                         countries = '-'.join(value)
                         record_to_save[key] = countries
+                    elif key == 'authors':
+                        record_to_save[key] = int(len(value))
                     else:
                         record_to_save[key] = value
             record_to_save['id'] = record_counter
             writer.writerow(record_to_save)
+
+
+def save_author_papers(filename):
+    db_papers = DBManager('bioinfo_papers')
+    papers = db_papers.search({})
+    current_dir = pathlib.Path(__file__).parents[0]
+    fn = current_dir.joinpath('data', filename)
+    logging.info('Exporting data of papers and authors, please wait...')
+    with open(str(fn), 'w', encoding='utf-8') as f:
+        headers = ['id', 'title', 'doi', 'author', 'author_position_in_paper']
+        writer = csv.DictWriter(f, fieldnames=headers)
+        writer.writeheader()
+        record_counter = 0
+        for paper in papers:
+            paper_authors = paper.get('authors')
+            if paper_authors:
+                for idx in range(0, len(paper_authors)):
+                    record_counter += 1
+                    record_to_save = {
+                        'id': record_counter,
+                        'title': paper['title'],
+                        'doi': paper['DOI'],
+                        'author': paper_authors[idx],
+                        'author_position_in_paper': idx
+                    }
+                    writer.writerow(record_to_save)
+            else:
+                print(f"Paper: {paper['title']} does not have authors")
