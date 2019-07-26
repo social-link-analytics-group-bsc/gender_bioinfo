@@ -43,12 +43,13 @@ def save_author_papers(filename):
     fn = current_dir.joinpath('data', filename)
     logging.info('Exporting data of papers and authors, please wait...')
     with open(str(fn), 'w', encoding='utf-8') as f:
-        headers = ['id', 'title', 'doi', 'author', 'author_position_in_paper']
+        headers = ['id', 'title', 'doi', 'year', 'category', 'author', 'author_gender', 'author_position']
         writer = csv.DictWriter(f, fieldnames=headers)
         writer.writeheader()
         record_counter = 0
         for paper in papers:
             paper_authors = paper.get('authors')
+            authors_gender = paper.get('authors_gender')
             if paper_authors:
                 for idx in range(0, len(paper_authors)):
                     record_counter += 1
@@ -56,8 +57,11 @@ def save_author_papers(filename):
                         'id': record_counter,
                         'title': paper['title'],
                         'doi': paper['DOI'],
+                        'year': paper['year'],
+                        'category': paper['edamCategory'],
                         'author': paper_authors[idx],
-                        'author_position_in_paper': idx
+                        'author_gender': authors_gender[idx],
+                        'author_position': idx+1
                     }
                     writer.writerow(record_to_save)
             else:
