@@ -36,7 +36,7 @@ def export_db_into_file(filename_to_export, db, fields_to_export):
             writer.writerow(record_to_save)
 
 
-def save_author_papers(filename):
+def export_author_papers(filename):
     db_papers = DBManager('bioinfo_papers')
     papers = db_papers.search({})
     current_dir = pathlib.Path(__file__).parents[0]
@@ -66,3 +66,26 @@ def save_author_papers(filename):
                     writer.writerow(record_to_save)
             else:
                 print(f"Paper: {paper['title']} does not have authors")
+
+
+def export_unknown_gender(filename):
+    db_authors = DBManager('bioinfo_authors')
+    u_authors = db_authors.search({'gender': 'unknown'})
+    current_dir = pathlib.Path(__file__).parents[0]
+    fn = current_dir.joinpath('data', filename)
+    logging.info('Exporting data of authors with unknown gender, please wait...')
+    with open(str(fn), 'w', encoding='utf-8') as f:
+        headers = ['id', 'name', 'gender', 'affiliation']
+        writer = csv.DictWriter(f, fieldnames=headers)
+        writer.writeheader()
+        record_counter = 0
+        for u_author in u_authors:
+            record_to_save = {
+                'id': record_counter,
+                'name': u_author['name'],
+                'gender': u_author['gender']
+            }
+            if u_author.get('affiliations'):
+                record_to_save['affiliation'] = u_author['affiliations'][len(u_author['affiliations'])-1]
+            writer.writerow(record_to_save)
+            record_counter += 1
