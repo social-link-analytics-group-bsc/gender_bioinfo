@@ -506,46 +506,104 @@ def record_linkage():
     dup_df.to_csv('data/potential_duplicates.csv', index=False)
 
 
+def __get_author(db_authors, author_names):
+    for author_name in author_names:
+        author_db = db_authors.find_record({'name': author_name})
+        if author_db:
+            return author_db
+        else:
+            author_db = db_authors.find_record({'other_names': {'$in': [author_name]}})
+            if author_db:
+                return author_db
+    return None
+
+
+def __generate_alternative_names(name):
+    name_vec = name.split()
+    alternative_names = []
+    alternative_name = ''
+    for i in range(1, len(name_vec)):
+        for j in range(0, len(name_vec)):
+            if i == j:
+                alternative_name = alternative_name[:len(alternative_name) - 1]
+                alternative_name += '-'
+            alternative_name += name_vec[j]
+            if j < len(name_vec) - 1:
+                alternative_name += ' '
+        alternative_names.append(alternative_name)
+        alternative_name = ''
+    return alternative_names
+
+
 def remove_author_duplicates():
     db_authors = DBManager('bioinfo_authors')
-    with open('data/potential_duplicates_completed.csv', 'r', encoding='utf-8') as f:
+    errors = pd.DataFrame()
+    with open('data/remove_duplicates_errors_fixed.csv', 'r', encoding='utf-8') as f:
         file = csv.DictReader(f, delimiter=',')
         for line in file:
-            if line['is_duplicated'] == 'si':
-                first_person = line['1_first_name'] + line['1_last_name']
-                second_person = line['2_first_name'] + line['2_last_name']
-                person_to_keep = line['person_to_keep']
-                if person_to_keep:
-                    if person_to_keep == '1':
-                        author_to_keep = db_authors.search({'name': first_person})
-                        author_to_remove = db_authors.search({'name': second_person})
+            if line['is_duplicated'].strip() == 'si':
+                try:
+                    logging.info(f"Processing record with id: {line['id']}")
+                    first_person = f"{line['1_first_name']} {line['1_last_name']}"
+                    first_person_names = [first_person]
+                    first_person_names.extend(__generate_alternative_names(first_person))
+                    second_person = f"{line['2_first_name']} {line['2_last_name']}"
+                    second_person_names = [second_person]
+                    second_person_names.extend(__generate_alternative_names(second_person))
+                    person_to_keep = line['person_to_keep']
+                    if person_to_keep:
+                        if person_to_keep == '1':
+                            author_to_keep = __get_author(db_authors, first_person_names)
+                            author_to_remove = __get_author(db_authors, second_person_names)
+                        else:
+                            author_to_keep = __get_author(db_authors, second_person_names)
+                            author_to_remove = __get_author(db_authors, first_person_names)
                     else:
-                        author_to_keep = db_authors.search({'name': second_person})
-                        author_to_remove = db_authors.search({'name': first_person})
-                else:
-                    if len(first_person) >= len(second_person):
-                        author_to_keep = db_authors.search({'name': first_person})
-                        author_to_remove = db_authors.search({'name': second_person})
+                        if len(first_person) >= len(second_person):
+                            author_to_keep = __get_author(db_authors, first_person_names)
+                            author_to_remove = __get_author(db_authors, second_person_names)
+                        else:
+                            author_to_keep = __get_author(db_authors, second_person_names)
+                            author_to_remove = __get_author(db_authors, first_person_names)
+                    if 'delete' in author_to_remove.keys():
+                        logging.info(f"The author {author_to_remove['name']} has the field delete. "
+                                     f"The record will be ignored")
+                        continue
+                    others_names = author_to_keep.get('other_names')
+                    if others_names:
+                        if author_to_remove['name'] not in others_names:
+                            others_names.append(author_to_remove['name'])
                     else:
-                        author_to_keep = db_authors.search({'name': second_person})
-                        author_to_remove = db_authors.search({'name': first_person})
-                others_names = author_to_keep.get('other_names')
-                if others_names:
-                    others_names.append(author_to_remove['name'])
-                else:
-                    others_names = [author_to_remove['name']]
-                updated_record = {
-                    'papers': author_to_keep['papers'] + author_to_remove['papers'],
-                    'total_citations': author_to_keep['total_citations'] + author_to_remove['total_citations'],
-                    'papers_as_first_author': author_to_keep['total_citations'] + author_to_remove['total_citations'],
-                    'dois': author_to_keep['dois'] + author_to_remove['dois'],
-                    'papers_with_citations': author_to_keep['papers_with_citations'] + author_to_remove['papers_with_citations'],
-                    'citations': author_to_keep['citations'] + author_to_remove['citations'],
-                    'affiliations': author_to_keep['affiliations'] + author_to_remove['affiliations'],
-                    'h-index': author_to_keep['h-index'] if author_to_keep['h-index'] > author_to_remove['h-index'] else author_to_remove['h-index'],
-                    'other_names': others_names
-                }
-                # Update record to keep
-                db_authors.update_record({'name': author_to_keep['name']}, {'other_names': updated_record})
-                # Delete record to remove
-                db_authors.update_record({'name': author_to_remove['name']}, {'delete': 1})
+                        others_names = [author_to_remove['name']]
+                    updated_record = {
+                        'papers': author_to_keep['papers'] + author_to_remove['papers'],
+                        'total_citations': author_to_keep['total_citations'] + author_to_remove['total_citations'],
+                        'papers_as_first_author': author_to_keep['total_citations'] + author_to_remove['total_citations'],
+                        'dois': author_to_keep['dois'] + author_to_remove['dois'],
+                        'papers_with_citations': author_to_keep['papers_with_citations'] + author_to_remove['papers_with_citations'],
+                        'citations': author_to_keep['citations'] + author_to_remove['citations'],
+                        'h-index': author_to_keep['h-index'] if author_to_keep['h-index'] > author_to_remove['h-index'] else author_to_remove['h-index'],
+                        'other_names': others_names
+                    }
+                    if author_to_keep.get('affiliations'):
+                        updated_record['affiliations'] = author_to_keep['affiliations']
+                    if author_to_remove.get('affiliations'):
+                        if 'affiliations' in updated_record.keys():
+                            if author_to_remove['affiliations'] not in updated_record['affiliations']:
+                                updated_record['affiliations'].append(author_to_remove['affiliations'])
+                        else:
+                            updated_record['affiliations'] = author_to_remove['affiliations']
+                    # Update record to keep
+                    logging.info(f"Updating the author {author_to_keep['name']}")
+                    db_authors.update_record({'name': author_to_keep['name']}, updated_record)
+                    # Delete record to remove
+                    logging.info(f"Labeling the author {author_to_remove['name']} to be deleted")
+                    db_authors.update_record({'name': author_to_remove['name']}, {'delete': 1})
+                except:
+                    if errors.shape[0] == 0:
+                        errors = pd.DataFrame(dict(line), index=[0])
+                    else:
+                        errors = errors.append(dict(line), ignore_index=True)
+                    logging.error(f"Problem with the record: {line}")
+    if errors.shape[0] > 0:
+        errors.to_csv('data/remove_duplicates_errors.csv', index=False)
