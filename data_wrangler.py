@@ -596,7 +596,7 @@ def remove_author_duplicates():
                     # Update record to keep
                     logging.info(f"Updating the author {author_to_keep['name']}")
                     db_authors.update_record({'name': author_to_keep['name']}, updated_record)
-                    # Delete record to remove
+                    # Label record with the delete flag
                     logging.info(f"Labeling the author {author_to_remove['name']} to be deleted")
                     db_authors.update_record({'name': author_to_remove['name']}, {'delete': 1})
                 except:
@@ -607,3 +607,25 @@ def remove_author_duplicates():
                     logging.error(f"Problem with the record: {line}")
     if errors.shape[0] > 0:
         errors.to_csv('data/remove_duplicates_errors.csv', index=False)
+
+
+def label_papers_with_all_authors_with_delete_flag():
+    db_papers = DBManager('bioinfo_papers')
+    db_authors = DBManager('bioinfo_authors')
+    papers = db_papers.search({})
+    papers_flagged = 0
+    for paper in papers:
+        author_names = paper['authors']
+        num_authors_with_delete_flag = 0
+        for author_name in author_names:
+            author_db = db_authors.find_record({'name': author_name})
+            namesake_author = db_authors.find_record({'other_names': {'$in': [author_name]}})
+            if not author_db and not namesake_author:
+                num_authors_with_delete_flag += 1
+            if author_db and 'delete' in author_db.keys() and not namesake_author:
+                num_authors_with_delete_flag += 1
+        if 0 < len(author_names) == num_authors_with_delete_flag > 0:
+            papers_flagged += 1
+            logging.info(f"The flag delete will be added to the paper {paper['DOI']}")
+            db_papers.update_record({'DOI': paper['DOI']}, {'delete': 1})
+    logging.info(f"{papers_flagged} papers were flagged")
