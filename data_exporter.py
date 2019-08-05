@@ -21,6 +21,9 @@ def export_db_into_file(filename_to_export, db, fields_to_export):
         writer.writeheader()
         record_counter = 0
         for record in records:
+            # Do not include records with the delete flag
+            if 'delete' in record.keys():
+                continue
             record_counter += 1
             record_to_save = dict()
             for key, value in record.items():
@@ -38,6 +41,7 @@ def export_db_into_file(filename_to_export, db, fields_to_export):
 
 def export_author_papers(filename):
     db_papers = DBManager('bioinfo_papers')
+    db_authors = DBManager('bioinfo_authors')
     papers = db_papers.search({})
     current_dir = pathlib.Path(__file__).parents[0]
     fn = current_dir.joinpath('data', filename)
@@ -52,18 +56,22 @@ def export_author_papers(filename):
             authors_gender = paper.get('authors_gender')
             if paper_authors:
                 for idx in range(0, len(paper_authors)):
-                    record_counter += 1
-                    record_to_save = {
-                        'id': record_counter,
-                        'title': paper['title'],
-                        'doi': paper['DOI'],
-                        'year': paper['year'],
-                        'category': paper['edamCategory'],
-                        'author': paper_authors[idx],
-                        'author_gender': authors_gender[idx],
-                        'author_position': idx+1
-                    }
-                    writer.writerow(record_to_save)
+                    author_db = db_authors.search({'name': paper_authors[idx]})
+                    if author_db:
+                        # Only include authors without the delete flag
+                        if 'delete' not in author_db.keys():
+                            record_counter += 1
+                            record_to_save = {
+                                'id': record_counter,
+                                'title': paper['title'],
+                                'doi': paper['DOI'],
+                                'year': paper['year'],
+                                'category': paper['edamCategory'],
+                                'author': paper_authors[idx],
+                                'author_gender': authors_gender[idx],
+                                'author_position': idx+1
+                            }
+                            writer.writerow(record_to_save)
             else:
                 print(f"Paper: {paper['title']} does not have authors")
 
