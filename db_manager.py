@@ -38,6 +38,9 @@ class DBManager:
         return self.__db[self.__collection].update_one(filter_query, {'$set': new_values},
                                                        upsert=create_if_doesnt_exist)
 
+    def update_all_records(self, new_values):
+        return self.__db[self.__collection].update_many({}, {'$set': new_values})
+
     def remove_field_from_record(self, filter_query, fields_to_remove):
         return self.__db[self.__collection].update_one(filter_query, {'$unset': fields_to_remove})
 
@@ -109,6 +112,23 @@ class DBManager:
             {'$group': group},
             {'$project': project},
             {'$sort': sort}
+        ]
+        result_docs = self.aggregate(pipeline)
+        return result_docs
+
+    def get_name_authors_without_del_flag(self):
+        match = {
+            'delete': {
+                '$exists': 0
+            }
+        }
+        project = {
+            'name': '$name',
+            '_id': 0
+        }
+        pipeline = [
+            {'$match': match},
+            {'$project': project}
         ]
         result_docs = self.aggregate(pipeline)
         return result_docs
