@@ -1,4 +1,4 @@
-from collections import defaultdict
+from bson.objectid import ObjectId
 from db_manager import DBManager
 from googleapiclient.discovery import build
 from recordlinkage import preprocessing, SortedNeighbourhoodIndex, Compare
@@ -9,7 +9,6 @@ import csv
 import bs4
 import logging
 import pathlib
-import pprint
 import pandas as pd
 
 
@@ -29,7 +28,10 @@ def create_author_record(author_name, author_gender, author_index, article, db_a
         'papers_as_first_author': 1 if author_index == 0 else 0,
         'dois': [article['DOI']],
         'papers_with_citations': 1 if int(article['citations']) > 0 else 0,
-        'citations': [int(article['citations'])]
+        'citations': [int(article['citations'])],
+        'affiliations': '',
+        'h-index': 0,
+        'papers_as_last_author': 0
     }
     db_authors.save_record(record_to_save)
     logging.info(f"Author {author_name} creado")
@@ -612,7 +614,7 @@ def remove_author_duplicates():
 def label_papers_with_all_authors_with_delete_flag():
     db_papers = DBManager('bioinfo_papers')
     db_authors = DBManager('bioinfo_authors')
-    papers = db_papers.search({})
+    papers = db_papers.search({'delete': {'$exists': 0}})
     papers_flagged = 0
     for paper in papers:
         author_names = paper['authors']
@@ -629,3 +631,27 @@ def label_papers_with_all_authors_with_delete_flag():
             logging.info(f"The flag delete will be added to the paper {paper['DOI']}")
             db_papers.update_record({'DOI': paper['DOI']}, {'delete': 1})
     logging.info(f"{papers_flagged} papers were flagged")
+
+
+def compute_metric_papers_as_last_author():
+    db_papers = DBManager('bioinfo_papers')
+    db_authors = DBManager('bioinfo_authors')
+    papers = db_papers.search({})
+    db_authors.update_all_records({'papers_as_last_author': 0})
+    for paper in papers:
+        author_names = paper['authors']
+        if len(author_names) > 0:
+            last_author = author_names[-1]
+            logging.info(f"Updating the record of {last_author}")
+            author_db = db_authors.find_record({'name': last_author})
+            if not author_db:
+                author_db = db_authors.find_record({'other_names': {'$in': [last_author]}})
+                if not author_db:
+                    logging.info(f"Author {last_author} does not exist")
+                    author_gender = get_gender(last_author)
+                    author_index = len(paper['authors'])-1
+                    create_author_record(last_author, author_gender, author_index, paper, db_authors)
+                    author_db = db_authors.find_record({'name': last_author})
+            papers_as_last_author = author_db['papers_as_last_author']
+            papers_as_last_author += 1
+            db_authors.update_record({'_id': author_db['_id']}, {'papers_as_last_author': papers_as_last_author})
