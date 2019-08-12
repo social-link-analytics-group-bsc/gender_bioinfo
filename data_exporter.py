@@ -33,14 +33,24 @@ def export_db_into_file(filename_to_export, db, fields_to_export):
                         countries = '-'.join(value)
                         record_to_save[key] = countries
                     elif key == 'authors':
-                        record_to_save[key] = int(len(value))
+                        num_authors = 0
+                        # Sum up only male or female authors
+                        for idx in range(0, len(value)):
+                            if record['authors_gender'][idx] == 'male' or record['authors_gender'][idx] == 'female':
+                                num_authors += 1
+                        record_to_save[key] = num_authors
                     else:
                         record_to_save[key] = value
                 else:
                     if key == 'authors_gender':
                         if 'gender_last_author' in fields_to_export:
                             if len(record['authors_gender']) > 0:
-                                record_to_save['gender_last_author'] = record['authors_gender'][-1]
+                                # Return the last gender, which should be male or female
+                                record['authors_gender'].reverse()
+                                for author_gender in record['authors_gender']:
+                                    if author_gender == 'male' or author_gender == 'female':
+                                        record_to_save['gender_last_author'] = author_gender
+                                        break
                             else:
                                 record_to_save['gender_last_author'] = '-'
             record_to_save['id'] = record_counter
