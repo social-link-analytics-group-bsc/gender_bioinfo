@@ -1,12 +1,13 @@
-from bson.objectid import ObjectId
 from db_manager import DBManager
 from googleapiclient.discovery import build
 from recordlinkage import preprocessing, SortedNeighbourhoodIndex, Compare
 from selenium import webdriver
 from utils import curate_author_name, get_config, get_base_url, load_countries_file, get_gender
+from similarity.jarowinkler import JaroWinkler
 
 import csv
 import bs4
+import datetime
 import logging
 import pathlib
 import pandas as pd
@@ -655,3 +656,71 @@ def compute_metric_papers_as_last_author():
             papers_as_last_author = author_db['papers_as_last_author']
             papers_as_last_author += 1
             db_authors.update_record({'_id': author_db['_id']}, {'papers_as_last_author': papers_as_last_author})
+
+
+def fix_author_metrics():
+    db_authors = DBManager('bioinfo_authors')
+    db_papers = DBManager('bioinfo_papers')
+    authors = db_authors.search({'updated_dt': {'$exists': 0}})
+    tot_authors = authors.count()
+    author_counter = 1
+    jarowinkler = JaroWinkler()
+    for author in authors:
+        logging.info(f"[{author_counter}/{tot_authors}] Updating the author: {author['name']}")
+        author_names = [author['name']]
+        if 'other_names' in author.keys():
+            author_names.extend(author['other_names'])
+        total_citations, papers_with_citations, papers_as_first_author, papers_as_last_author = 0, 0, 0, 0
+        list_citations = []
+        is_alternative, other_name = '', ''
+        for doi in author['dois']:
+            paper_db = db_papers.find_record({'DOI': doi})
+            citations = int(paper_db['citations'])
+            total_citations += citations
+            list_citations.append(citations)
+            if citations > 0:
+                papers_with_citations += 1
+            idx = 0
+            found_author = False
+            max_similarity_idx, max_similarity_score = -1, -10000
+            for idx in range(0, len(paper_db['authors'])):
+                if paper_db['authors'][idx] in author_names:
+                    found_author = True
+                    break
+                else:
+                    similarity_score = jarowinkler.similarity(author['name'], paper_db['authors'][idx])
+                    if similarity_score > max_similarity_score:
+                        max_similarity_idx = idx
+                        max_similarity_score = similarity_score
+            if found_author:
+                if idx == 0:
+                    papers_as_first_author += 1
+                else:
+                    if (idx+1) == len(paper_db['authors']):
+                        papers_as_last_author += 1
+            else:
+                print(f"Could not find the author {author['name']} in the paper {doi}")
+                is_alternative = str(input(f"Is {paper_db['authors'][max_similarity_idx]} an alternative name of "
+                                           f"{author['name']}? (y/n) "))
+                if is_alternative == 'y':
+                    other_name = paper_db['authors'][max_similarity_idx]
+                    if max_similarity_idx == 0:
+                        papers_as_first_author += 1
+                    elif (max_similarity_idx+1) == len(paper_db['authors']):
+                        papers_as_last_author += 1
+        author_dict = {
+            'papers': len(author['dois']),
+            'total_citations': total_citations,
+            'papers_as_first_author': papers_as_first_author,
+            'papers_with_citations': papers_with_citations,
+            'citations': list_citations,
+            'papers_as_last_author': papers_as_last_author,
+            'updated_dt': datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+        }
+        if is_alternative == 'y':
+            other_names = [other_name]
+            if 'other_names' in author.keys():
+                other_names.extend(author['other_names'])
+            author_dict['other_names'] = other_names
+        db_authors.update_record({'_id': author['_id']}, author_dict)
+        author_counter += 1
