@@ -36,7 +36,10 @@ def export_db_into_file(filename_to_export, db, fields_to_export):
                         num_authors = 0
                         # Sum up only male or female authors
                         for idx in range(0, len(value)):
-                            if record['authors_gender'][idx] == 'male' or record['authors_gender'][idx] == 'female':
+                            if record['authors_gender'][idx] == 'male' or \
+                               record['authors_gender'][idx] == 'female' or \
+                               record['authors_gender'][idx] == 'mostly_male' or \
+                               record['authors_gender'][idx] == 'mostly_female':
                                 num_authors += 1
                         record_to_save[key] = num_authors
                     else:
@@ -80,13 +83,17 @@ def export_author_papers(filename):
             authors_gender = paper.get('authors_gender')
             if paper_authors:
                 for idx in range(0, len(paper_authors)):
+                    author_name = paper_authors[idx]
                     include_record = False
-                    if not paper_authors[idx] in authors_without_del_flag:
-                        if db_authors.find_record({'other_names': {'$in': [paper_authors[idx]]}}) is None:
+                    if paper_authors[idx] not in authors_without_del_flag:
+                        author_db = db_authors.find_record({'other_names': {'$in': [paper_authors[idx]]}})
+                        if author_db is None:
                             logging.info(f"The author {paper_authors[idx]} contains the delete flag so it won't be "
                                          f"exported")
                         else:
-                            include_record = True
+                            if 'delete' not in author_db:
+                                author_name = author_db['name']
+                                include_record = True
                     else:
                         include_record = True
                     if include_record:
@@ -98,7 +105,7 @@ def export_author_papers(filename):
                             'doi': paper['DOI'],
                             'year': paper['year'],
                             'category': paper['edamCategory'],
-                            'author': paper_authors[idx],
+                            'author': author_name,
                             'author_gender': authors_gender[idx],
                             'author_position': idx+1
                         }
