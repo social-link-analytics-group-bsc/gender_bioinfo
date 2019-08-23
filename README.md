@@ -1,21 +1,52 @@
-# Large-scale study on the bioinformatics research field
+# Large-Scale Study on Gender Bias in Bioinformatics
+
+This repo contains the scripts and data used to examine gender bias in Bioinformatics. By taking five representative
+journals in the field—[Oxford Bioinformatics](https://academic.oup.com/bioinformatics), 
+[Plos Computational Biology](https://journals.plos.org/ploscompbiol/), [Nucleic Acids Research](https://academic.oup.com/nar), 
+[BMC Bioinformatics](https://bmcbioinformatics.biomedcentral.com/), and 
+[BMC Genomics](https://bmcgenomics.biomedcentral.com/)—,we conduct a large-scale analysis of the role of female 
+researchers in Bionformatics from 2000 to 2017.
 
 ## Data Collection
 
-1. Extract articles published between 2000 and 2015 from the journals: Oxford Bioinformatics, 
-Plos Computational Biology, Nucleic Acids Research, BMC bioinformatics, and BMC Genomics;
+Data were obtained from [Scopus](https://www.scopus.com), one of today's most complete repository of scientific 
+manuscripts. The data was collected on August 22nd and 23rd, 2019, so the obtained articles correspond to the 
+information available on Scopus at that moment. Below the steps were performed to get the data. 
 
-2. Iterate over the articles' dois and get the url of the publications by using the Doi Resolution Service 
-(http://dx.doi.org/);  
+- Query the search engine of Scopus using the next string through *Advaced Search* to extract articles published 
+between 2000 and 2017 from above mentioned journals.
 
-3. Iterate over the list of articles' urls and extract the authors and their affiliations. For the affiliation, we
-store the institution name exactly as it appears in the website of the article. In addition, we take the last word
-of the institution name and assume that it refers to the country where the institution is located. To cross-check if it is 
-actually a country name, we compare it against a list of 264 countries;
+`ISSN ( 'JOURNAL_ISSN' ) AND ( LIMIT-TO ( PUBYEAR , 2017 ) OR LIMIT-TO ( PUBYEAR , 2016 ) OR LIMIT-TO ( PUBYEAR , 2015 ) 
+OR LIMIT-TO ( PUBYEAR , 2014 ) OR LIMIT-TO ( PUBYEAR , 2013 ) OR LIMIT-TO ( PUBYEAR , 2012 ) OR 
+LIMIT-TO ( PUBYEAR , 2011 ) OR LIMIT-TO ( PUBYEAR , 2010 ) OR LIMIT-TO ( PUBYEAR , 2009 ) OR LIMIT-TO ( PUBYEAR , 2008 )
+OR LIMIT-TO ( PUBYEAR , 2007 ) OR LIMIT-TO ( PUBYEAR , 2006 ) OR LIMIT-TO ( PUBYEAR , 2005 ) ) AND 
+( LIMIT-TO ( EXACTKEYWORD , "Article" ) )`
 
-4. For each author, get their gender by using the NamSor API (http://api.namsor.com/)
+| Journal                    | ISSN      |
+|----------------------------|-----------|
+| Oxford Bioinformatics      | 1460-2059 |
+| Plos Computational Biology | 1553-734X |
+| Nucleic Acid Research      | 1362-4962 |
+| BMC Bioinformatics         | 1471-2105 |
+| BMC Genomics               | 1471-2164 |
 
-All of these data are stored in a MongoDB database
+- Use the function *Export* to download the data about the articles. CSV was chosen as the *export method* and all of 
+the information available per article (citation, bibliographical, abstract, funding, etc.) was asked to export. Here it 
+is important to mention that Scopus limits to 2,000 the number of records that can be exported at a time, so in some 
+situations the range of years (2000-2017) was split in several searches to comply with this restriction. 
+
+The raw data downloaded can be found in CSV files located in `data/raw/full`. The `data/raw/summary` directory contains 
+files with only citation information about the articles. 
+
+## Data Processing
+
+1. Combine the files located in `data/raw/full` into file CSV files, one per journal.
+
+2. Store the information in the CSV of journals into a MongoDB database.
+
+## Gender Identification
+
+1. For each author, get their gender by using the NamSor API (http://api.namsor.com/).
 
 ## Data Cleaning
 
