@@ -8,9 +8,11 @@ from similarity.jarowinkler import JaroWinkler
 import csv
 import bs4
 import datetime
+import googlemaps
 import logging
 import pathlib
 import pandas as pd
+import os
 
 
 logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gender_identification.log')),
@@ -724,3 +726,85 @@ def fix_author_metrics():
             author_dict['other_names'] = other_names
         db_authors.update_record({'_id': author['_id']}, author_dict)
         author_counter += 1
+
+
+def create_affiliation_collection():
+    db_authors = DBManager('bioinfo_authors')
+    db_affiliations = DBManager('bioinfo_affiliations')
+    authors = db_authors.search({})
+    num_affiliations = 0
+    for author in authors:
+        if 'affiliations' in author:
+            author_affiliations = author['affiliations']
+            for author_affiliation in author_affiliations:
+                affiliation = db_affiliations.find_record({'name': author_affiliation})
+                if affiliation:
+                    logging.info(f"Updating affiliation: {author_affiliation}")
+                    author_ids = affiliation['author_ids']
+                    author_ids.append(author['_id'])
+                    db_affiliations.update_record({'name': author_affiliation}, {'author_ids': author_ids})
+                else:
+                    logging.info(f"Creating affiliation: {author_affiliation}")
+                    db_affiliations.store_record(
+                        {'name': author_affiliation,
+                         'country': '',
+                         'city': '',
+                         'latitude': '',
+                         'longitude': '',
+                         'author_ids': [author['_id']]
+                         }
+                    )
+                    num_affiliations += 1
+        else:
+            logging.info(f"The author {author['name']} does not have affiliations")
+    logging.info(f"Affiliations created: {num_affiliations}")
+
+
+def process_affiliations():
+    db_affiliations = DBManager('bioinfo_affiliations')
+    api_key = ''
+    gmaps = googlemaps.Client(key=f"{api_key}")
+    affiliations = db_affiliations.search({})
+    for affiliation in affiliations:
+        geocode_result = gmaps.geocode(affiliation['name'])
+        if geocode_result['status'] == 'OK':
+            if len(geocode_result['results']) == 1:
+                affiliation_dict = {
+                    'address': geocode_result['results'][0]['formatted_address'],
+                    'latitude': geocode_result['results'][0]['geometry']['location']['lat'],
+                    'longitude': geocode_result['results'][0]['geometry']['location']['lng'],
+                    'country': geocode_result['results'][0]['address_components'][4]['long_name'],
+                    'city': geocode_result['results'][0]['address_components'][5]['long_name'],
+                    'postal_code': geocode_result['results'][0]['address_components'][6]['long_name']
+                }
+                db_affiliations.update_record({'name': affiliation['name']}, affiliation_dict)
+            else:
+                db_affiliations.update_record({'name': affiliation['name']}, {'error': 'more than one result'})
+                logging.info(f"More than one result returned")
+        else:
+            db_affiliations.update_record({'name': affiliation['name']}, {'error': geocode_result['status']})
+            logging.info(f"Returned status: {geocode_result['status']}")
+
+
+def __save_dataframe_to_csv(dataframe, name):
+    journal_csv_file = pathlib.Path('data', 'processed').joinpath(name + '.csv')
+    logging.info(f"Saving {dataframe.shape[0]} records in {journal_csv_file}")
+    dataframe.to_csv(journal_csv_file, index=False)
+
+
+def combine_csv_files():
+    dir = pathlib.Path('data', 'raw', 'full')
+    file_names = sorted(os.listdir(dir))
+    journal_name, master_name = '', ''
+    master_df = None
+    for file_name in file_names:
+        journal_name = '_'.join([token for token in file_name.split('_') if token.isalpha()])
+        file_name = dir.joinpath(file_name)
+        if master_name != journal_name:
+            if master_df is not None:
+                __save_dataframe_to_csv(master_df, master_name)
+            master_df = pd.read_csv(file_name, index_col='DOI')
+            master_name = journal_name
+        else:
+            master_df = master_df.append(pd.read_csv(file_name, index_col='DOI'), ignore_index=True)
+    __save_dataframe_to_csv(master_df, master_name)
