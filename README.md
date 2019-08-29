@@ -5,7 +5,8 @@ journals in the field—[Oxford Bioinformatics](https://academic.oup.com/bioinfo
 [Plos Computational Biology](https://journals.plos.org/ploscompbiol/), [Nucleic Acids Research](https://academic.oup.com/nar), 
 [BMC Bioinformatics](https://bmcbioinformatics.biomedcentral.com/), and 
 [BMC Genomics](https://bmcgenomics.biomedcentral.com/)—,we conduct a large-scale analysis of the role of female 
-researchers in Bionformatics from 2000 to 2017.
+researchers in Bionformatics from 2005 to 2017. We chose to start in 2005 because this was the starting year of Plos 
+Computational Biology.
 
 ## Data Collection
 
@@ -14,13 +15,12 @@ manuscripts. The data was collected on August 22nd and 23rd, 2019, so the obtain
 information available on Scopus at that moment. Below the steps were performed to get the data. 
 
 - Query the search engine of Scopus using the next string through *Advaced Search* to extract articles published 
-between 2000 and 2017 from above mentioned journals.
+between 2005 and 2017 from above mentioned journals.
 
-`ISSN ( 'JOURNAL_ISSN' ) AND ( LIMIT-TO ( PUBYEAR , 2017 ) OR LIMIT-TO ( PUBYEAR , 2016 ) OR LIMIT-TO ( PUBYEAR , 2015 ) 
-OR LIMIT-TO ( PUBYEAR , 2014 ) OR LIMIT-TO ( PUBYEAR , 2013 ) OR LIMIT-TO ( PUBYEAR , 2012 ) OR 
-LIMIT-TO ( PUBYEAR , 2011 ) OR LIMIT-TO ( PUBYEAR , 2010 ) OR LIMIT-TO ( PUBYEAR , 2009 ) OR LIMIT-TO ( PUBYEAR , 2008 )
-OR LIMIT-TO ( PUBYEAR , 2007 ) OR LIMIT-TO ( PUBYEAR , 2006 ) OR LIMIT-TO ( PUBYEAR , 2005 ) ) AND 
-( LIMIT-TO ( EXACTKEYWORD , "Article" ) )`
+`ISSN ( 'JOURNAL_ISSN' ) AND ( LIMIT-TO ( DOCTYPE,"ar" ) OR LIMIT-TO ( DOCTYPE,"cp" ) ) AND ( LIMIT-TO ( PUBYEAR , 2017 )
+OR LIMIT-TO ( PUBYEAR , 2016 ) OR LIMIT-TO ( PUBYEAR , 2015 ) OR LIMIT-TO ( PUBYEAR , 2014 ) OR LIMIT-TO ( PUBYEAR , 2013 )
+OR LIMIT-TO ( PUBYEAR , 2012 ) OR LIMIT-TO ( PUBYEAR , 2011 ) OR LIMIT-TO ( PUBYEAR , 2010 ) OR LIMIT-TO ( PUBYEAR , 2009 ) 
+OR LIMIT-TO ( PUBYEAR , 2008 ) OR LIMIT-TO ( PUBYEAR , 2007 ) OR LIMIT-TO ( PUBYEAR , 2006 ) OR LIMIT-TO ( PUBYEAR , 2005 ) )`
 
 | Journal                    | ISSN      |
 |----------------------------|-----------|
@@ -33,7 +33,7 @@ OR LIMIT-TO ( PUBYEAR , 2007 ) OR LIMIT-TO ( PUBYEAR , 2006 ) OR LIMIT-TO ( PUBY
 - Use the function *Export* to download the data about the articles. CSV was chosen as the *export method* and all of 
 the information available per article (citation, bibliographical, abstract, funding, etc.) was asked to export. Here it 
 is important to mention that Scopus limits to 2,000 the number of records that can be exported at a time, so in some 
-situations the range of years (2000-2017) was split in several searches to comply with this restriction. 
+situations the range of years (2005-2017) was split in several searches to comply with this restriction. 
 
 The raw data downloaded can be found in CSV files located in `data/raw/full`. The `data/raw/summary` directory contains 
 files with only citation information about the articles. 
