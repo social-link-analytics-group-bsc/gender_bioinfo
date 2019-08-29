@@ -797,14 +797,19 @@ def combine_csv_files():
     file_names = sorted(os.listdir(dir))
     journal_name, master_name = '', ''
     master_df = None
+    logging.info('Starting the combination of csv files...')
     for file_name in file_names:
+        logging.info(f"\nProcessing: {file_name}")
         journal_name = '_'.join([token for token in file_name.split('_') if token.isalpha()])
         file_name = dir.joinpath(file_name)
         if master_name != journal_name:
             if master_df is not None:
                 __save_dataframe_to_csv(master_df, master_name)
             master_df = pd.read_csv(file_name, index_col='DOI')
+            logging.info(f"Num. Articles: {master_df.shape[0]}")
             master_name = journal_name
         else:
-            master_df = master_df.append(pd.read_csv(file_name, index_col='DOI'), ignore_index=True)
+            aux_df = pd.read_csv(file_name, index_col='DOI')
+            logging.info(f"Num. Articles: {aux_df.shape[0]}")
+            master_df = master_df.append(aux_df, ignore_index=True)
     __save_dataframe_to_csv(master_df, master_name)
