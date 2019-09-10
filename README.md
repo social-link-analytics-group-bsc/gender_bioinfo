@@ -40,7 +40,8 @@ files with only citation information about the articles.
 
 ## Data Processing
 
-1. Combine the files located in `data/raw/full` into file CSV files, one per journal.
+1. Use the function `combine_csv_files` located in `data_wrangler.py` to combine the files in `data/raw/full` 
+into one CSV file per journal.
 
 2. Store the information in the CSV of journals into a MongoDB database.
 
