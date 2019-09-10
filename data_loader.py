@@ -74,15 +74,15 @@ def __process_paper_authors(paper_summary, paper_full, db_authors, author_names,
                 db_authors.save_record({'id': author_id, 'affiliations': author_affs})
 
 
-def __obtain_paper_abstract(file_name, paper_doi):
+def __obtain_paper_abstract_and_pubmedid(file_name, paper_eid):
     dir_full = pathlib.Path('data', 'processed')
-    journal_file_name = dir_full.joinpath('data', file_name)
+    journal_file_name = dir_full.joinpath(file_name)
     with open(str(journal_file_name), 'r', encoding='ISO-8859-1') as f:
-        file = csv.DictReader(f, delimiter='\t')
+        file = csv.DictReader(f, delimiter=',')
         for line in file:
-            if line['DOI'] == paper_doi:
-                return line['abstract']
-    return None
+            if line['EID'] == paper_eid:
+                return line['Abstract'], line['PubMed ID']
+    return None, None
 
 
 def load_data_from_files_into_db():
@@ -94,9 +94,9 @@ def load_data_from_files_into_db():
     file_names = sorted(os.listdir(dir_summary))
     for file_name in file_names:
         logging.info(f"\nProcessing: {file_name}")
-        journal_file_name = dir_summary.joinpath('data', file_name)
+        journal_file_name = dir_summary.joinpath(file_name)
         with open(str(journal_file_name), 'r', encoding='ISO-8859-1') as f:
-            file = csv.DictReader(f, delimiter='\t')
+            file = csv.DictReader(f, delimiter=',')
             for line in file:
                 paper_db = db_papers_old.find_record({'DOI': line['DOI']})
                 if paper_db:
@@ -104,19 +104,19 @@ def load_data_from_files_into_db():
                     link = paper_db['link']
                     authors = paper_db['authors']
                     authors_gender = paper_db['authors_gender']
-                    pubmed_id = paper_db['pubmed_id']
                 else:
                     paper_categories = ''
+                    logging.info(f"Obtaining the link of the paper {line['DOI']}")
                     link = dc.get_paper_link_from_doi(line['DOI'])
-                    pubmed_id = None
                     authors = []
                     authors_gender = []
+                abstract, pubmed_id = __obtain_paper_abstract_and_pubmedid(file_name, line['EID'])
                 record_to_save = {
                     'title': line['Title'],
                     'year': line['Year'],
                     'DOI': line['DOI'],
                     'source': line['Source title'],
-                    'volume': line['Volumen'],
+                    'volume': line['Volume'],
                     'issue': line['Issue'],
                     'scopus_id': line['Art. No.'],
                     'link': link,
@@ -126,7 +126,7 @@ def load_data_from_files_into_db():
                     'authors': authors,
                     'authors_gender': authors_gender,
                     'pubmed_id': pubmed_id,
-                    'abstract': __obtain_paper_abstract(file_name, line['DOI'])
+                    'abstract': abstract
                 }
                 db_papers_new.store_record(record_to_save)
                 __process_paper_authors(line, '', db_authors_new, authors, authors_gender)
