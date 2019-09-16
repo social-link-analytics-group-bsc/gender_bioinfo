@@ -24,15 +24,15 @@ def load_data_from_file_into_db(filename):
 
 
 def __process_paper_authors(paper_summary, paper_full, db_authors, author_names, authors_gender):
-    author_ids = paper_summary['Author(s) ID'].split(';').strip()
-    author_affiliations = paper_full['Authors with affiliations'].split(';').strip()
+    author_ids = paper_summary['Author(s) ID'].split(';')
+    author_affiliations = paper_full['Authors with affiliations'].split(';')
     paper_doi = paper_summary['DOI']
     if len(author_names) > 0:
         author_index = 0
         for full_author in zip(author_names, author_ids, author_affiliations):
             author_name = full_author[0]
-            author_id = full_author[1]
-            author_affiliation = full_author[2]
+            author_id = full_author[1].strip()
+            author_affiliation = ','.join(full_author[2].split(',')[2:]).strip()
             author_db_new = db_authors.find_record({'id': author_id})
             if author_db_new:
                 update_author_record(
@@ -61,8 +61,8 @@ def __process_paper_authors(paper_summary, paper_full, db_authors, author_names,
             author_index += 1
     else:
         for full_author in zip(author_ids, author_affiliations):
-            author_id = full_author[0]
-            author_affiliation = full_author[1]
+            author_id = full_author[0].strip()
+            author_affiliation = ','.join(full_author[1].split(',')[2:]).strip()
             author_db_new = db_authors.find_record({'id': author_id})
             if author_db_new:
                 author_affs = author_db_new['affiliations']
@@ -81,7 +81,7 @@ def __obtain_paper_abstract_and_pubmedid(file_name, paper_eid):
         file = csv.DictReader(f, delimiter=',')
         for line in file:
             if line['EID'] == paper_eid:
-                return line['Abstract'], line['PubMed ID']
+                return line['Abstract'], line['PubMed ID'], line
     return None, None
 
 
@@ -99,18 +99,22 @@ def load_data_from_files_into_db():
             file = csv.DictReader(f, delimiter=',')
             for line in file:
                 paper_db = db_papers_old.find_record({'DOI': line['DOI']})
+                pubmed_id = None
                 if paper_db:
                     paper_categories = paper_db['edamCategory']
                     link = paper_db['link']
                     authors = paper_db['authors']
                     authors_gender = paper_db['authors_gender']
+                    pubmed_id = paper_db['pubmed_id']
                 else:
                     paper_categories = ''
                     logging.info(f"Obtaining the link of the paper {line['DOI']}")
                     link = dc.get_paper_link_from_doi(line['DOI'])
                     authors = []
                     authors_gender = []
-                abstract, pubmed_id = __obtain_paper_abstract_and_pubmedid(file_name, line['EID'])
+                abstract, _pubmed_id, paper_full = __obtain_paper_abstract_and_pubmedid(file_name, line['EID'])
+                if not pubmed_id:
+                    pubmed_id = _pubmed_id
                 record_to_save = {
                     'title': line['Title'],
                     'year': line['Year'],
@@ -129,7 +133,7 @@ def load_data_from_files_into_db():
                     'abstract': abstract
                 }
                 db_papers_new.store_record(record_to_save)
-                __process_paper_authors(line, '', db_authors_new, authors, authors_gender)
+                __process_paper_authors(line, paper_full, db_authors_new, authors, authors_gender)
 
 
 def update_data_from_file(filename):
