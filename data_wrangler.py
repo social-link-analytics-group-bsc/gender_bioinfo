@@ -39,7 +39,10 @@ def create_author_record(author_name, author_gender, author_index, article, db_a
     if author_id:
         record_to_save['id'] = author_id
     db_authors.save_record(record_to_save)
-    logging.info(f"Author {author_name} creado!")
+    if author_name:
+        logging.info(f"Author {author_name} creado!")
+    else:
+        logging.info(f"Author {author_id} creado!")
 
 
 def update_author_record(author_in_db, author_name, author_index, author_gender, article, db_authors):
@@ -81,7 +84,10 @@ def update_author_record(author_in_db, author_name, author_index, author_gender,
         logging.warning(f"Author {author_name}'s with gender inconsistency. "
                         f"Stored {author_in_db.get('gender')}. Article (doi {article['DOI']}) author_gender")
     db_authors.update_record({'name': author_name}, values_to_update)
-    logging.info(f"Actualizado author {author_name}")
+    if author_name:
+        logging.info(f"Actualizado author {author_name}")
+    else:
+        logging.info(f"Actualizado author {author_in_db}")
 
 
 def create_update_paper_authors_collection():
