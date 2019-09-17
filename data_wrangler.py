@@ -22,7 +22,7 @@ logging.getLogger('googleapiclient.discovery').setLevel(logging.ERROR)
 logging.getLogger('urllib3.connectionpool').setLevel(logging.ERROR)
 
 
-def create_author_record(author_name, author_gender, author_index, article, db_authors):
+def create_author_record(author_name, author_gender, author_index, article, db_authors, author_id=-1):
     record_to_save = {
         'name': author_name,
         'gender': author_gender,
@@ -36,8 +36,10 @@ def create_author_record(author_name, author_gender, author_index, article, db_a
         'h-index': 0,
         'papers_as_last_author': 0
     }
+    if author_id > 0:
+        record_to_save['id'] = author_id
     db_authors.save_record(record_to_save)
-    logging.info(f"Author {author_name} creado")
+    logging.info(f"Author {author_name} creado!")
 
 
 def update_author_record(author_in_db, author_name, author_index, author_gender, article, db_authors):
