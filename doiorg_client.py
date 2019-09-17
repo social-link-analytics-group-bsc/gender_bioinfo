@@ -14,7 +14,6 @@ class DoiClient:
 
     def __init__(self):
         self.driver = webdriver.Chrome()
-        self.driver.get("https://dx.doi.org/")
 
     def __is_robot_page(self):
         try:
@@ -44,6 +43,7 @@ class DoiClient:
                 return self.driver.current_url
 
     def get_paper_link_from_doi(self, paper_doi):
+        self.driver.get("https://dx.doi.org/")
         element = self.driver.find_element_by_xpath("//input[@name='hdl'][@type='text']")
         element.send_keys(str(paper_doi))
         element.submit()
