@@ -54,12 +54,16 @@ class DBManager:
         return self.__db[self.__collection].find(query, no_cursor_timeout=True)
 
     def store_record(self, record_to_store):
-        num_results = 0
         if 'DOI' in record_to_store:
             record_identifier = record_to_store['DOI']
-            num_results = self.search({'DOI': record_identifier}).count()
-        else:
+            query = {'DOI': record_identifier}
+        elif 'name' in record_to_store:
             record_identifier = record_to_store['name']
+            query = {'name': record_identifier}
+        else:
+            record_identifier = record_to_store['id']
+            query = {'id': record_identifier}
+        num_results = self.search(query).count()
         if num_results == 0:
             self.save_record(record_to_store)
             logging.info(f"Inserted record identified by: {record_identifier}")
