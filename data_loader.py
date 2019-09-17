@@ -100,11 +100,15 @@ def __process_paper_authors(paper_summary, paper_full, db_authors, author_names,
                 logging.info(f"Author with id {author_id} already exist")
                 author_affs = author_db_new['affiliations']
                 affiliations_to_save = __affiliations_to_save(author_affs, actual_affiliations)
+                dois = author_db_new['dois']
+                dois.append(paper_doi)
                 if len(affiliations_to_save) > 0:
                     author_affs.extend(affiliations_to_save)
-                    db_authors.update_record({'id': author_id}, {'affiliations': author_affs})
+                    db_authors.update_record({'id': author_id}, {'affiliations': author_affs, 'dois': dois})
+                else:
+                    db_authors.update_record({'id': author_id}, {'dois': dois})
             else:
-                db_authors.store_record({'id': author_id, 'last_name': author_last_name,
+                db_authors.store_record({'id': author_id, 'last_name': author_last_name, 'dois': [paper_doi],
                                          'affiliations': actual_affiliations})
 
 
