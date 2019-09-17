@@ -1,6 +1,7 @@
 from data_wrangler import create_author_record, update_author_record
 from db_manager import DBManager
 from doiorg_client import DoiClient
+from similarity.jarowinkler import JaroWinkler
 
 import ast
 import csv
@@ -23,9 +24,35 @@ def load_data_from_file_into_db(filename):
             db.store_record(line)
 
 
+def __affiliations_to_save(affiliations, new_affiliations):
+    jarowinkler = JaroWinkler()
+    similarity_threshold = 0.95
+    affiliations_to_save = []
+    for new_affiliation in new_affiliations:
+        exist_affiliation = False
+        for affiliation in affiliations:
+            similarity_score = jarowinkler.similarity(affiliation.lower(), new_affiliation.lower())
+            if similarity_score >= similarity_threshold:
+                exist_affiliation = True
+        if not exist_affiliation:
+            affiliations_to_save.append(new_affiliation)
+    return affiliations_to_save
+
+
+def __get_actual_affiliations(affiliations, author_affiliation):
+    actual_affiliations = []
+    author_affiliation = author_affiliation.strip()
+    for affiliation in affiliations:
+        affiliation = affiliation.strip()
+        if affiliation.lower() in author_affiliation.lower():
+            actual_affiliations.append(affiliation.strip())
+    return actual_affiliations
+
+
 def __process_paper_authors(paper_summary, paper_full, db_authors, author_names, authors_gender):
     author_ids = paper_summary['Author(s) ID'].split(';')
     author_affiliations = paper_full['Authors with affiliations'].split(';')
+    affiliations = paper_full['Affiliations'].split(';')
     paper_doi = paper_summary['DOI']
     if len(author_names) > 0:
         author_index = 0
@@ -44,8 +71,10 @@ def __process_paper_authors(paper_summary, paper_full, db_authors, author_names,
                     db_authors=db_authors
                 )
                 author_affs = author_db_new['affiliations']
-                if author_affiliation.lower() not in author_affs:
-                    author_affs.append(author_affiliation)
+                actual_affiliations = __get_actual_affiliations(affiliations, author_affiliation)
+                affiliations_to_save = __affiliations_to_save(author_affs, actual_affiliations)
+                if len(affiliations_to_save) > 0:
+                    author_affs.extend(affiliations_to_save)
             else:
                 author_name = author_name
                 author_gender = authors_gender[author_index]
@@ -54,24 +83,29 @@ def __process_paper_authors(paper_summary, paper_full, db_authors, author_names,
                     author_gender=author_gender,
                     author_index=author_index,
                     article={'DOI': paper_doi, 'citations': paper_summary['Cited by']},
-                    db_authors=db_authors
+                    db_authors=db_authors,
+                    author_id=author_id
                 )
-                author_affs = [author_affiliation]
-            db_authors.update_record({'id': author_id}, {'affiliations': author_affs})
+                actual_affiliations = __get_actual_affiliations(affiliations, author_affiliation)
+            db_authors.update_record({'id': author_id}, {'affiliations': actual_affiliations})
             author_index += 1
     else:
         for full_author in zip(author_ids, author_affiliations):
             author_id = full_author[0].strip()
             author_affiliation = ','.join(full_author[1].split(',')[2:]).strip()
+            author_last_name = full_author[1].split(',')[0].strip().title()
             author_db_new = db_authors.find_record({'id': author_id})
+            actual_affiliations = __get_actual_affiliations(affiliations, author_affiliation)
             if author_db_new:
+                logging.info(f"Author with id {author_id} already exist")
                 author_affs = author_db_new['affiliations']
-                if author_affiliation.lower() not in author_affs:
-                    author_affs.append(author_affiliation)
-                db_authors.update_record({'id': author_id}, {'affiliations': author_affs})
+                affiliations_to_save = __affiliations_to_save(author_affs, actual_affiliations)
+                if len(affiliations_to_save) > 0:
+                    author_affs.extend(affiliations_to_save)
+                    db_authors.update_record({'id': author_id}, {'affiliations': author_affs})
             else:
-                author_affs = [author_affiliation]
-                db_authors.save_record({'id': author_id, 'affiliations': author_affs})
+                db_authors.store_record({'id': author_id, 'last_name': author_last_name,
+                                         'affiliations': actual_affiliations})
 
 
 def __obtain_paper_abstract_and_pubmedid(file_name, paper_eid):
@@ -82,7 +116,7 @@ def __obtain_paper_abstract_and_pubmedid(file_name, paper_eid):
         for line in file:
             if line['EID'] == paper_eid:
                 return line['Abstract'], line['PubMed ID'], line
-    return None, None
+    return None, None, None
 
 
 def load_data_from_files_into_db():
@@ -133,7 +167,10 @@ def load_data_from_files_into_db():
                     'abstract': abstract
                 }
                 db_papers_new.store_record(record_to_save)
-                __process_paper_authors(line, paper_full, db_authors_new, authors, authors_gender)
+                if paper_full:
+                    __process_paper_authors(line, paper_full, db_authors_new, authors, authors_gender)
+                else:
+                    logging.error(f"Could not find the full details of the paper {line['DOI']}")
 
 
 def update_data_from_file(filename):
