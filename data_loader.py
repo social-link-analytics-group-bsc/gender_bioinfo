@@ -54,6 +54,7 @@ def __process_paper_authors(paper_summary, paper_full, db_authors, author_names,
     author_affiliations = paper_full['Authors with affiliations'].split(';')
     affiliations = paper_full['Affiliations'].split(';')
     paper_doi = paper_summary['DOI']
+    paper_citations = paper_summary['Cited by'] if paper_summary['Cited by'] else paper_full['Cited by']
     author_index = 0
     if author_names:
         it_authors = zip(author_names, author_ids, author_affiliations)
@@ -78,7 +79,7 @@ def __process_paper_authors(paper_summary, paper_full, db_authors, author_names,
                 author_name=author_db_new['name'],
                 author_index=author_index,
                 author_gender=author_db_new['gender'],
-                article={'DOI': paper_doi, 'citations': paper_summary['Cited by']},
+                article={'DOI': paper_doi, 'citations': paper_citations},
                 db_authors=db_authors
             )
             author_affs = author_db_new['affiliations']
@@ -95,7 +96,7 @@ def __process_paper_authors(paper_summary, paper_full, db_authors, author_names,
                 author_name=author_name,
                 author_gender=author_gender,
                 author_index=author_index,
-                article={'DOI': paper_doi, 'citations': paper_summary['Cited by']},
+                article={'DOI': paper_doi, 'citations': paper_citations},
                 db_authors=db_authors,
                 author_id=author_id
             )
@@ -128,45 +129,49 @@ def load_data_from_files_into_db():
         with open(str(journal_file_name), 'r', encoding='ISO-8859-1') as f:
             file = csv.DictReader(f, delimiter=',')
             for line in file:
-                paper_db = db_papers_old.find_record({'DOI': line['DOI']})
-                pubmed_id = None
-                if paper_db:
-                    paper_categories = paper_db['edamCategory']
-                    link = paper_db['link']
-                    authors = paper_db['authors']
-                    authors_gender = paper_db['authors_gender']
-                    pubmed_id = paper_db['pubmed_id']
+                paper_new_db = db_papers_new.find_record({'DOI': line['DOI']})
+                if not paper_new_db:
+                    paper_old_db = db_papers_old.find_record({'DOI': line['DOI']})
+                    pubmed_id = None
+                    if paper_old_db:
+                        paper_categories = paper_old_db['edamCategory']
+                        link = paper_old_db['link']
+                        authors = paper_old_db['authors']
+                        authors_gender = paper_old_db['authors_gender']
+                        pubmed_id = paper_old_db['pubmed_id']
+                    else:
+                        paper_categories = ''
+                        logging.info(f"Obtaining the link of the paper {line['DOI']}")
+                        link = dc.get_paper_link_from_doi(line['DOI'])
+                        authors = []
+                        authors_gender = []
+                    abstract, _pubmed_id, paper_full = __obtain_paper_abstract_and_pubmedid(file_name, line['EID'])
+                    if not pubmed_id:
+                        pubmed_id = _pubmed_id
+                    record_to_save = {
+                        'title': line['Title'],
+                        'year': line['Year'],
+                        'DOI': line['DOI'],
+                        'source': line['Source title'],
+                        'volume': line['Volume'],
+                        'issue': line['Issue'],
+                        'scopus_id': line['Art. No.'],
+                        'link': link,
+                        'e_id': line['EID'],
+                        'citations': line['Cited by'],
+                        'edamCategory': paper_categories,
+                        'authors': authors,
+                        'authors_gender': authors_gender,
+                        'pubmed_id': pubmed_id,
+                        'abstract': abstract
+                    }
+                    db_papers_new.store_record(record_to_save)
+                    if paper_full:
+                        __process_paper_authors(line, paper_full, db_authors_new, authors, authors_gender)
+                    else:
+                        logging.error(f"Could not find the full details of the paper {line['DOI']}")
                 else:
-                    paper_categories = ''
-                    logging.info(f"Obtaining the link of the paper {line['DOI']}")
-                    link = dc.get_paper_link_from_doi(line['DOI'])
-                    authors = []
-                    authors_gender = []
-                abstract, _pubmed_id, paper_full = __obtain_paper_abstract_and_pubmedid(file_name, line['EID'])
-                if not pubmed_id:
-                    pubmed_id = _pubmed_id
-                record_to_save = {
-                    'title': line['Title'],
-                    'year': line['Year'],
-                    'DOI': line['DOI'],
-                    'source': line['Source title'],
-                    'volume': line['Volume'],
-                    'issue': line['Issue'],
-                    'scopus_id': line['Art. No.'],
-                    'link': link,
-                    'e_id': line['EID'],
-                    'citations': line['Cited by'],
-                    'edamCategory': paper_categories,
-                    'authors': authors,
-                    'authors_gender': authors_gender,
-                    'pubmed_id': pubmed_id,
-                    'abstract': abstract
-                }
-                db_papers_new.store_record(record_to_save)
-                if paper_full:
-                    __process_paper_authors(line, paper_full, db_authors_new, authors, authors_gender)
-                else:
-                    logging.error(f"Could not find the full details of the paper {line['DOI']}")
+                    logging.info(f"Paper {line['DOI']} already in the database!")
 
 
 def update_data_from_file(filename):
