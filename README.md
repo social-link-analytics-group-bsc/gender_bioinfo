@@ -38,12 +38,30 @@ situations the range of years (2005-2017) was split in several searches to compl
 The raw data downloaded can be found in CSV files located in `data/raw/full`. The `data/raw/summary` directory contains 
 files with only citation information about the articles. 
 
+## Data Pre-Processing
+
+From `run.py` run the function `combine_csv_files` in `data_wrangler.py` to combine the files in `data/raw/full` 
+into one CSV file per journal. The resulting files will be store in `data/processed` (you might need to create the
+folder *`processed`* inside *`data`* before running the function)
+
+## Data Loading
+
+1. Before loading the data you will need to install **MongoDB Community Edition**. Instructions on how to install it can be
+found [here](https://docs.mongodb.com/manual/installation/) 
+
+2. Set up a Mongodb database and create two collections, namely `bioinfo_papers` and `bioinfo_authors`
+
+3. Set in `src/config.json` the information of the MongoDB database that will be used to store the data
+
+4. From `run.py` run the function `load_data_from_files_into_db` in `data_loader.py` to load the data in `data/raw/summary`
+and `data/processed` into the database. Information about papers will be stored in `bioinfo_papers` while information
+on papers' authors will be recorded in `bioinfo_authors`. This process takes a while in part because it takes the DOI of
+the papers and extracts from `https://dx.doi.org/` their links. The links to the papers is information not 
+provided by Scopus
+
 ## Data Processing
 
-1. Use the function `combine_csv_files` located in `data_wrangler.py` to combine the files in `data/raw/full` 
-into one CSV file per journal.
-
-2. Store the information in the CSV of journals into a MongoDB database.
+1.  
 
 ## Gender Identification
 
@@ -55,3 +73,8 @@ into one CSV file per journal.
 
 2. Remove duplicate authors from the database.
  
+## Technologies
+
+1. [Python 3.4](https://www.python.org/downloads/)
+2. [MongoDB Community Edition](https://www.mongodb.com/download-center#community)
+3. [Selenium WebDriver](https://www.seleniumhq.org/projects/webdriver/)
