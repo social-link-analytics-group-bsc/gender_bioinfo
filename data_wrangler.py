@@ -23,15 +23,16 @@ logging.getLogger('urllib3.connectionpool').setLevel(logging.ERROR)
 
 
 def create_author_record(author_name, author_gender, author_index, article, db_authors, author_id=''):
+    citations = int(article['citations']) if article['citations'] else ''
     record_to_save = {
         'name': author_name,
         'gender': author_gender,
         'papers': 1,
-        'total_citations': int(article['citations']),
+        'total_citations': citations,
         'papers_as_first_author': 1 if author_index == 0 else 0,
         'dois': [article['DOI']],
-        'papers_with_citations': 1 if int(article['citations']) > 0 else 0,
-        'citations': [int(article['citations'])],
+        'papers_with_citations': 1 if article['citations'] and int(article['citations']) > 0 else 0,
+        'citations': [citations],
         'affiliations': '',
         'h-index': 0,
         'papers_as_last_author': 0
@@ -51,15 +52,16 @@ def update_author_record(author_in_db, author_name, author_index, author_gender,
         author_dois = author_in_db['dois']
     else:
         author_dois = [article['DOI']]
+    citations = int(article['citations']) if article['citations'] else ''
     if 'citations' in author_in_db.keys():
-        author_in_db['citations'].append(int(article['citations']))
+        author_in_db['citations'].append(citations)
         author_citations = author_in_db['citations']
     else:
-        author_citations = [int(article['citations'])]
+        author_citations = [citations]
     if 'total_citations' in author_in_db.keys():
-        total_citations = author_in_db['total_citations'] + int(article['citations'])
+        total_citations = author_in_db['total_citations'] + citations if citations else author_in_db['total_citations']
     else:
-        total_citations = int(article['citations'])
+        total_citations = int(article['citations']) if citations else 0
     values_to_update = {
         'papers': author_in_db['papers'] + 1 if 'papers' in author_in_db.keys() else 1,
         'total_citations': total_citations,
@@ -71,7 +73,7 @@ def update_author_record(author_in_db, author_name, author_index, author_gender,
             values_to_update['papers_as_first_author'] = author_in_db['papers_as_first_author'] + 1
         else:
             values_to_update['papers_as_first_author'] = 1
-    if int(article['citations']) > 0:
+    if citations and citations > 0:
         if 'papers_with_citations' in author_in_db.keys():
             values_to_update['papers_with_citations'] = author_in_db['papers_with_citations'] + 1
         else:
