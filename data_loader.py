@@ -129,6 +129,7 @@ def load_data_from_files_into_db():
         with open(str(journal_file_name), 'r', encoding='ISO-8859-1') as f:
             file = csv.DictReader(f, delimiter=',')
             for line in file:
+                logging.info(f"Processing the paper {line['DOI']}")
                 paper_new_db = db_papers_new.find_record({'DOI': line['DOI']})
                 if not paper_new_db:
                     paper_old_db = db_papers_old.find_record({'DOI': line['DOI']})
@@ -136,9 +137,9 @@ def load_data_from_files_into_db():
                     if paper_old_db:
                         paper_categories = paper_old_db['edamCategory']
                         link = paper_old_db['link']
-                        authors = paper_old_db['authors']
-                        authors_gender = paper_old_db['authors_gender']
-                        pubmed_id = paper_old_db['pubmed_id']
+                        authors = paper_old_db.get('authors')
+                        authors_gender = paper_old_db.get('authors_gender')
+                        pubmed_id = paper_old_db.get('pubmed_id')
                     else:
                         paper_categories = ''
                         logging.info(f"Obtaining the link of the paper {line['DOI']}")
@@ -160,8 +161,6 @@ def load_data_from_files_into_db():
                         'e_id': line['EID'],
                         'citations': line['Cited by'],
                         'edamCategory': paper_categories,
-                        'authors': authors,
-                        'authors_gender': authors_gender,
                         'pubmed_id': pubmed_id,
                         'abstract': abstract
                     }
