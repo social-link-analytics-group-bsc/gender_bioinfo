@@ -60,9 +60,10 @@ def update_author_record(author_in_db, author_name, author_index, author_gender,
         author_citations = [citations]
     if 'total_citations' in author_in_db.keys():
         if citations:
-            if type(author_in_db['total_citations']) == 'int':
+            try:
+                int(author_in_db['total_citations'])
                 total_citations = citations + author_in_db['total_citations']
-            else:
+            except:
                 total_citations = citations
         else:
             total_citations = author_in_db['total_citations']
