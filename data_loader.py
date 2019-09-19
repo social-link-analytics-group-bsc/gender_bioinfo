@@ -6,12 +6,15 @@ from utils import get_config
 
 import ast
 import csv
+import ctypes
 import logging
 import pathlib
 import os
 
 logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gender_identification.log')),
                     level=logging.DEBUG)
+
+csv.field_size_limit(int(ctypes.c_ulong(-1).value // 2))
 
 
 def load_data_from_file_into_db(filename):
