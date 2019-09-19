@@ -3,5 +3,10 @@
     "host": "",
     "port": "",
     "db_name": ""
+  },
+  "pubmed": {
+    "email": "",
+    "api_key": "",
+    "tool": "biasbioinfo"
   }
 }
