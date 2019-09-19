@@ -1,4 +1,4 @@
-# Large-Scale Study on Gender Bias in Bioinformatics
+# Gender Bias in Bioinformatics
 
 This repo contains the scripts and data used to examine gender bias in Bioinformatics. By taking five representative
 journals in the field—[Oxford Bioinformatics](https://academic.oup.com/bioinformatics), 
