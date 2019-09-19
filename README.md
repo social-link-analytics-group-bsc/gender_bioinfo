@@ -36,7 +36,21 @@ is important to mention that Scopus limits to 2,000 the number of records that c
 situations the range of years (2005-2017) was split in several searches to comply with this restriction. 
 
 The raw data downloaded can be found in CSV files located in `data/raw/full`. The `data/raw/summary` directory contains 
-files with only citation information about the articles. 
+files with only citation information about the articles. In total information of 47,427 papers and their corresponding
+authors were collect through the described method. 
+
+## Getting Started
+
+1. Download and install Python >= 3.4.4;
+2. Download and install MongoDB community version;
+3. Clone the repository `git clone https://github.com/ParticipaPY/politic-bots.git`;
+4. Get into the directory of the repository `cd politic-bots`;
+5. Create a virtual environment by running `virtualenv env`;
+6. Activate the virtual environment by executing `source env/bin/activate`;
+7. Inside the directory of the repository install the project dependencies by running `pip install -r requirements.txt`;
+8. Set the database information inside the dictionary `mongo` in `config.json`;
+9. Get a key to operate the API of PubMed by following the instructions [here](https://www.ncbi.nlm.nih.gov/books/NBK25497/#chapter2.Usage_Guidelines_and_Requiremen)
+10. Set the obtained API key and email address inside the dictionary `pubmed` in `config.json`
 
 ## Data Pre-Processing
 
@@ -55,26 +69,41 @@ found [here](https://docs.mongodb.com/manual/installation/)
 
 4. From `run.py` run the function `load_data_from_files_into_db` in `data_loader.py` to load the data in `data/raw/summary`
 and `data/processed` into the database. Information about papers will be stored in `bioinfo_papers` while information
-on papers' authors will be recorded in `bioinfo_authors`. This process takes a while in part because it takes the DOI of
-the papers and extracts from `https://dx.doi.org/` their links. The links to the papers is information not 
-provided by Scopus
+on papers' authors will be recorded in `bioinfo_authors`. This function takes a while to complete in part because it 
+connects to [DOI resolution](https://dx.doi.org/) to extract link of the papers—links to the papers are not provided 
+by Scopus. The completion time can be sped up by commenting the line #162 in `data_loader.py`.
 
 ## Data Processing
 
-1.  
+Scopus does not provide the full name of authors—only the initial of the first (and middle) name and the last name.
+However, the PubMed identifier of the articles is provided by Scopus. We use the PubMed Id of the articles to hit the 
+[API of PubMed](https://www.ncbi.nlm.nih.gov/home/develop/api/) and get information about papers' authors, including 
+their full names. To complete the name of authors, run from `run.py` the function `...`. The function takes a while
+to complete.
 
-## Gender Identification
+**Gender Identification**. Taking the full name of authors, the API [NamSor](http://api.namsor.com/) is used to infer the
+authors' gender. In case, NamSor fails to identify the gender, the python package [gender-guesser](https://pypi.org/project/gender-guesser/)
+is used to find out the gender of authors. Information on how [NamSor](https://www.namsor.com/) works can be at its 
+website. To compute gender identification, run from `run.py` the function `...`. Given the large number of names, the function 
+takes a while to complete.
 
-1. For each author, get their gender by using the NamSor API (http://api.namsor.com/).
+## Gender Bias Analysis
 
-## Data Cleaning
-
-1. Curate the name of authors by removing non alpha characters, such as numbers, or starts, underscores, and commas.
-
-2. Remove duplicate authors from the database.
+The scripts used to conduct all of the gender bias analyses are contained in the jupyter notebook `analysis/gender_bias_analysis.ipynb` 
  
 ## Technologies
 
 1. [Python 3.4](https://www.python.org/downloads/)
-2. [MongoDB Community Edition](https://www.mongodb.com/download-center#community)
-3. [Selenium WebDriver](https://www.seleniumhq.org/projects/webdriver/)
+2. [MongoDB Community Edition](https://www.mongodb.com/download-center#community)—used as data storage repository
+3. [Selenium WebDriver](https://www.seleniumhq.org/projects/webdriver/)—used to resolve papers' DOIs
+4. [Biopython](https://biopython.org/)—PubMed API client
+5. [Jupyter Notebook](https://jupyter.org/)—Data exploration and analysis
+
+## Issues
+
+Please use [Github's issue tracker](https://github.com/ParticipaPY/politic-bots/issues/new) to report issues and suggestions.
+
+## Contributors
+
+[Jorge Saldivar](https://github.com/joausaga), [Fabio Curi](https://github.com/fabiocuri), María José Rementería, 
+Nataly Buslón, and Alfonso Valencia
