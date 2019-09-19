@@ -54,7 +54,7 @@ authors were collect through the described method.
 
 ## Data Pre-Processing
 
-From `run.py` run the function `combine_csv_files` in `data_wrangler.py` to combine the files in `data/raw/full` 
+From `run.py` execute the function `combine_csv_files` in `data_wrangler.py` to combine the files in `data/raw/full` 
 into one CSV file per journal. The resulting files will be store in `data/processed` (you might need to create the
 folder *`processed`* inside *`data`* before running the function)
 
@@ -67,7 +67,7 @@ found [here](https://docs.mongodb.com/manual/installation/)
 
 3. Set in `src/config.json` the information of the MongoDB database that will be used to store the data
 
-4. From `run.py` run the function `load_data_from_files_into_db` in `data_loader.py` to load the data in `data/raw/summary`
+4. From `run.py` execute the function `load_data_from_files_into_db` in `data_loader.py` to load the data in `data/raw/summary`
 and `data/processed` into the database. Information about papers will be stored in `bioinfo_papers` while information
 on papers' authors will be recorded in `bioinfo_authors`. This function takes a while to complete in part because it 
 connects to [DOI resolution](https://dx.doi.org/) to extract link of the papers—links to the papers are not provided 
@@ -78,13 +78,13 @@ by Scopus. The completion time can be sped up by commenting the line #162 in `da
 Scopus does not provide the full name of authors—only the initial of the first (and middle) name and the last name.
 However, the PubMed identifier of the articles is provided by Scopus. We use the PubMed Id of the articles to hit the 
 [API of PubMed](https://www.ncbi.nlm.nih.gov/home/develop/api/) and get information about papers' authors, including 
-their full names. To complete the name of authors, run from `run.py` the function `...`. The function takes a while
+their full names. To complete the name of authors, execute from `run.py` the function `...`. The function takes a while
 to complete.
 
 **Gender Identification**. Taking the full name of authors, the API [NamSor](http://api.namsor.com/) is used to infer the
 authors' gender. In case, NamSor fails to identify the gender, the python package [gender-guesser](https://pypi.org/project/gender-guesser/)
 is used to find out the gender of authors. Information on how [NamSor](https://www.namsor.com/) works can be at its 
-website. To compute gender identification, run from `run.py` the function `...`. Given the large number of names, the function 
+website. To compute gender identification, execute from `run.py` the function `...`. Given the large number of names, the function 
 takes a while to complete.
 
 ## Gender Bias Analysis
