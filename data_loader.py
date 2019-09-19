@@ -2,6 +2,7 @@ from data_wrangler import create_author_record, update_author_record
 from db_manager import DBManager
 from doiorg_client import DoiClient
 from similarity.jarowinkler import JaroWinkler
+from utils import get_config
 
 import ast
 import csv
@@ -116,11 +117,21 @@ def __obtain_paper_abstract_and_pubmedid(file_name, paper_eid):
     return None, None, None
 
 
-def load_data_from_files_into_db():
+def __get_db_name():
+    current_dir = pathlib.Path(__file__).parents[0]
+    config_fn = current_dir.joinpath('config.json')
+    config = get_config(config_fn)
+    return config['mongo']['db_name']
+
+
+def load_data_from_files_into_db(exist_old_db=False, name_old_db=''):
     dc = DoiClient()
-    db_papers_new = DBManager('bioinfo_papers', db_name='bioinfo')
-    db_authors_new = DBManager('bioinfo_authors', db_name='bioinfo')
-    db_papers_old = DBManager('bioinfo_papers', db_name='bio4women')
+    db_name = __get_db_name()
+    db_papers_old = None
+    db_papers_new = DBManager('bioinfo_papers', db_name=db_name)
+    db_authors_new = DBManager('bioinfo_authors', db_name=db_name)
+    if exist_old_db:
+        db_papers_old = DBManager('bioinfo_papers', db_name=name_old_db)
     dir_summary = pathlib.Path('data', 'raw', 'summary')
     file_names = sorted(os.listdir(dir_summary))
     for file_name in file_names:
@@ -132,7 +143,9 @@ def load_data_from_files_into_db():
                 logging.info(f"Processing the paper {line['DOI']}")
                 paper_new_db = db_papers_new.find_record({'DOI': line['DOI']})
                 if not paper_new_db:
-                    paper_old_db = db_papers_old.find_record({'DOI': line['DOI']})
+                    paper_old_db = None
+                    if db_papers_old:
+                        paper_old_db = db_papers_old.find_record({'DOI': line['DOI']})
                     pubmed_id = None
                     if paper_old_db:
                         paper_categories = paper_old_db['edamCategory']
