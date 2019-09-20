@@ -106,5 +106,5 @@ Please use [Github's issue tracker](https://github.com/ParticipaPY/politic-bots/
 
 ## Contributors
 
-[Jorge Saldivar](https://github.com/joausaga), [Fabio Curi](https://github.com/fabiocuri), María José Rementería, 
-Nataly Buslón, and Alfonso Valencia
+[Jorge Saldivar](https://github.com/joausaga), [Fabio Curi](https://github.com/fabiocuri), Nataly Buslón, María José Rementería, 
+and Alfonso Valencia
