@@ -10,8 +10,7 @@ Computational Biology.
 
 ## Data Collection
 
-Data were obtained from [Scopus](https://www.scopus.com), one of today's most complete repository of scientific 
-manuscripts. The data was collected on August 22nd and 23rd, 2019, so the obtained articles correspond to the 
+Data were obtained from [Scopus](https://www.scopus.com), one of today's most complete repository of scientific manuscripts. The data was collected on August 22nd and 23rd, 2019, so the obtained articles correspond to the 
 information available on Scopus at that moment. Below the steps were performed to get the data. 
 
 - Query the search engine of Scopus using the next string through *Advaced Search* to extract articles published 
@@ -34,11 +33,11 @@ OR LIMIT-TO ( PUBYEAR , 2008 ) OR LIMIT-TO ( PUBYEAR , 2007 ) OR LIMIT-TO ( PUBY
 - Use the function *Export* to download the data about the articles. CSV was chosen as the *export method* and all of 
 the information available per article (citation, bibliographical, abstract, funding, etc.) was asked to export. Here it 
 is important to mention that Scopus limits to 2,000 the number of records that can be exported at a time, so in some 
-situations the range of years (2005-2017) was split in several searches to comply with this restriction. 
+situations, the range of years (2005-2017) was split in several searches to comply with this restriction. 
 
 The raw data downloaded can be found in CSV files located in `data/raw/full`. The `data/raw/summary` directory contains 
 files with only citation information about the articles. In total information of 47,427 papers and their corresponding
-authors were collect through the described method. The table above shows the number of papers per journal extracted 
+authors were collected through the described method. The table above shows the number of papers per journal extracted 
 from Scopus.
 
 ## Getting Started
@@ -57,7 +56,7 @@ from Scopus.
 ## Data Pre-Processing
 
 From `run.py` execute the function `combine_csv_files` in `data_wrangler.py` to combine the files in `data/raw/full` 
-into one CSV file per journal. The resulting files will be store in `data/processed` (you might need to create the
+into one CSV file per journal. The resulting files will be stored in `data/processed` (you might need to create the
 folder *`processed`* inside *`data`* before running the function)
 
 ## Data Loading
@@ -91,7 +90,7 @@ takes a while to complete.
 
 ## Gender Bias Analysis
 
-The scripts used to conduct all of the gender bias analyses are contained in the jupyter notebook `analysis/gender_bias_analysis.ipynb` 
+The scripts used to conduct all of the gender bias analyses are contained in the Jupyter notebook `analysis/gender_bias_analysis.ipynb` 
  
 ## Technologies
 
