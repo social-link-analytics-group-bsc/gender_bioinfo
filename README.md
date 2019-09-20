@@ -22,13 +22,14 @@ OR LIMIT-TO ( PUBYEAR , 2016 ) OR LIMIT-TO ( PUBYEAR , 2015 ) OR LIMIT-TO ( PUBY
 OR LIMIT-TO ( PUBYEAR , 2012 ) OR LIMIT-TO ( PUBYEAR , 2011 ) OR LIMIT-TO ( PUBYEAR , 2010 ) OR LIMIT-TO ( PUBYEAR , 2009 ) 
 OR LIMIT-TO ( PUBYEAR , 2008 ) OR LIMIT-TO ( PUBYEAR , 2007 ) OR LIMIT-TO ( PUBYEAR , 2006 ) OR LIMIT-TO ( PUBYEAR , 2005 ) )`
 
-| Journal                    | ISSN      |
-|----------------------------|-----------|
-| Oxford Bioinformatics      | 1460-2059 |
-| Plos Computational Biology | 1553-734X |
-| Nucleic Acid Research      | 1362-4962 |
-| BMC Bioinformatics         | 1471-2105 |
-| BMC Genomics               | 1471-2164 |
+| Journal                    | ISSN      |  Papers Extracted   |
+|----------------------------|-----------|------------|
+| Oxford Bioinformatics      | 1460-2059 |  8,546     |
+| Plos Computational Biology | 1553-734X |  5,132     |
+| Nucleic Acids Research     | 1362-4962 |  15,670    |
+| BMC Bioinformatics         | 1471-2105 |  7,879     |
+| BMC Genomics               | 1471-2164 |  10,200    |
+| **Total**                  |           |  47,427    |
 
 - Use the function *Export* to download the data about the articles. CSV was chosen as the *export method* and all of 
 the information available per article (citation, bibliographical, abstract, funding, etc.) was asked to export. Here it 
@@ -37,7 +38,8 @@ situations the range of years (2005-2017) was split in several searches to compl
 
 The raw data downloaded can be found in CSV files located in `data/raw/full`. The `data/raw/summary` directory contains 
 files with only citation information about the articles. In total information of 47,427 papers and their corresponding
-authors were collect through the described method. 
+authors were collect through the described method. The table above shows the number of papers per journal extracted 
+from Scopus.
 
 ## Getting Started
 
