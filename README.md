@@ -74,6 +74,9 @@ on papers' authors will be recorded in `bioinfo_authors`. This function takes a 
 connects to [DOI resolution](https://dx.doi.org/) to extract link of the papers—links to the papers are not provided 
 by Scopus. The completion time can be sped up by commenting the line #162 in `data_loader.py`.
 
+Duplicated records (194) and entries without DOI (401) are not included in the loading process. **In total, 46,832 records
+are stored in the database**.
+
 ## Data Processing
 
 Scopus does not provide the full name of authors—only the initial of the first (and middle) name and the last name.
