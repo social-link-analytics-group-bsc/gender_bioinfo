@@ -2,7 +2,7 @@ from db_manager import DBManager
 from googleapiclient.discovery import build
 from recordlinkage import preprocessing, SortedNeighbourhoodIndex, Compare
 from selenium import webdriver
-from utils import curate_author_name, get_config, get_base_url, load_countries_file, get_gender
+from utils import curate_author_name, get_config, get_base_url, load_countries_file, get_gender, get_db_name
 from similarity.jarowinkler import JaroWinkler
 
 import csv
@@ -20,6 +20,7 @@ logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gen
 logging.getLogger('selenium.webdriver.remote.remote_connection').setLevel(logging.ERROR)
 logging.getLogger('googleapiclient.discovery').setLevel(logging.ERROR)
 logging.getLogger('urllib3.connectionpool').setLevel(logging.ERROR)
+logging.getLogger('matplotlib').setLevel(logging.ERROR)
 
 
 def create_author_record(author_name, author_gender, author_index, article, db_authors, author_id=''):
@@ -830,3 +831,10 @@ def combine_csv_files():
             logging.info(f"Num. Articles: {aux_df.shape[0]}")
             master_df = master_df.append(aux_df, ignore_index=True)
     __save_dataframe_to_csv(master_df, master_name)
+
+
+def standardize_source_name():
+    db_papers = DBManager('bioinfo_papers', db_name=get_db_name())
+    papers_db = db_papers.search({})
+    for paper_db in papers_db:
+        db_papers.update_record({'DOI': paper_db['DOI']}, {'source': paper_db['source'].title()})
