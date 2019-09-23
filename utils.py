@@ -88,3 +88,10 @@ def title_except(str_to_title, exceptions=('a', 'an', 'of', 'the')):
     for word in word_list[1:]:
         final.append(word if word in exceptions else word.capitalize())
     return " ".join(final)
+
+
+def get_db_name():
+    current_dir = pathlib.Path(__file__).parents[0]
+    config_fn = current_dir.joinpath('config.json')
+    config = get_config(config_fn)
+    return config['mongo']['db_name']
