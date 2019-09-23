@@ -1,8 +1,9 @@
+from collections import defaultdict
 from data_wrangler import create_author_record, update_author_record
 from db_manager import DBManager
 from doiorg_client import DoiClient
 from similarity.jarowinkler import JaroWinkler
-from utils import get_config
+from utils import get_db_name
 
 import ast
 import csv
@@ -120,16 +121,9 @@ def __obtain_paper_abstract_and_pubmedid(file_name, paper_eid):
     return None, None, None
 
 
-def __get_db_name():
-    current_dir = pathlib.Path(__file__).parents[0]
-    config_fn = current_dir.joinpath('config.json')
-    config = get_config(config_fn)
-    return config['mongo']['db_name']
-
-
 def load_data_from_files_into_db(exist_old_db=False, name_old_db=''):
     dc = DoiClient()
-    db_name = __get_db_name()
+    db_name = get_db_name()
     db_papers_old = None
     db_papers_new = DBManager('bioinfo_papers', db_name=db_name)
     db_authors_new = DBManager('bioinfo_authors', db_name=db_name)
@@ -137,6 +131,7 @@ def load_data_from_files_into_db(exist_old_db=False, name_old_db=''):
         db_papers_old = DBManager('bioinfo_papers', db_name=name_old_db)
     dir_summary = pathlib.Path('data', 'raw', 'summary')
     file_names = sorted(os.listdir(dir_summary))
+    num_insertions = 0
     for file_name in file_names:
         logging.info(f"\nProcessing: {file_name}")
         journal_file_name = dir_summary.joinpath(file_name)
@@ -144,6 +139,8 @@ def load_data_from_files_into_db(exist_old_db=False, name_old_db=''):
             file = csv.DictReader(f, delimiter=',')
             for line in file:
                 logging.info(f"Processing the paper {line['DOI']}")
+                if not line['DOI']:
+                    continue
                 paper_new_db = db_papers_new.find_record({'DOI': line['DOI']})
                 if not paper_new_db:
                     paper_old_db = None
@@ -169,7 +166,7 @@ def load_data_from_files_into_db(exist_old_db=False, name_old_db=''):
                         'title': line['Title'],
                         'year': line['Year'],
                         'DOI': line['DOI'],
-                        'source': line['Source title'],
+                        'source': line['Source title'].title(),
                         'volume': line['Volume'],
                         'issue': line['Issue'],
                         'scopus_id': line['Art. No.'],
@@ -181,12 +178,40 @@ def load_data_from_files_into_db(exist_old_db=False, name_old_db=''):
                         'abstract': abstract
                     }
                     db_papers_new.store_record(record_to_save)
+                    num_insertions += 1
                     if paper_full:
                         __process_paper_authors(line, paper_full, db_authors_new, authors, authors_gender)
                     else:
                         logging.error(f"Could not find the full details of the paper {line['DOI']}")
                 else:
                     logging.info(f"Paper {line['DOI']} already in the database!")
+    logging.info(f"\n{num_insertions} new papers were inserted!")
+
+
+def check_data_to_insert():
+    dir_summary = pathlib.Path('data', 'raw', 'summary')
+    file_names = sorted(os.listdir(dir_summary))
+    papers_to_insert = 0
+    journal = []
+    for file_name in file_names:
+        papers_without_doi, num_duplicates, num_papers = 0, 0, 0
+        logging.info(f"\nProcessing: {file_name}")
+        journal_file_name = dir_summary.joinpath(file_name)
+        with open(str(journal_file_name), 'r', encoding='ISO-8859-1') as f:
+            file = csv.DictReader(f, delimiter=',')
+            for line in file:
+                num_papers += 1
+                if line['DOI']:
+                    if line['DOI'] not in journal:
+                        papers_to_insert += 1
+                        journal.append(line['DOI'])
+                    else:
+                        num_duplicates += 1
+                else:
+                    papers_without_doi += 1
+            logging.info(f"Num. Papers: {num_papers}, Num. Unique Papers: {papers_to_insert}, "
+                         f"Num. Duplicates: {num_duplicates}, Papers without DOI: {papers_without_doi}")
+    logging.info(f"Total of papers to insert (list): {len(journal)}")
 
 
 def update_data_from_file(filename):
