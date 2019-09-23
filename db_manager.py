@@ -28,6 +28,9 @@ class DBManager:
             self.__db = client[db_name]
         self.__collection = collection
 
+    def num_records(self, query):
+        return self.__db[self.__collection].count_documents(query)
+
     def save_record(self, record_to_save):
         self.__db[self.__collection].insert(record_to_save)
 
@@ -50,8 +53,11 @@ class DBManager:
     def remove_record(self, filter_query):
         return self.__db[self.__collection].remove(filter_query)
 
-    def search(self, query):
-        return self.__db[self.__collection].find(query, no_cursor_timeout=True)
+    def search(self, query, return_fields=None):
+        if not return_fields:
+            return self.__db[self.__collection].find(query, no_cursor_timeout=True)
+        else:
+            return self.__db[self.__collection].find(query, return_fields, no_cursor_timeout=True)
 
     def store_record(self, record_to_store):
         if 'DOI' in record_to_store:
