@@ -194,7 +194,8 @@ def load_data_from_files_into_db(exist_old_db=False, name_old_db=''):
 
 def load_author_data_from_scopus_files():
     db_name = get_db_name()
-    db_authors_new = DBManager('bioinfo_authors', db_name=db_name)
+    db_authors = DBManager('bioinfo_authors', db_name=db_name)
+    db_papers = DBManager('bioinfo_papers', db_name=db_name)
     dir_summary = pathlib.Path('data', 'raw', 'summary')
     file_names = sorted(os.listdir(dir_summary))
     for file_name in file_names:
@@ -203,9 +204,11 @@ def load_author_data_from_scopus_files():
         with open(str(journal_file_name), 'r') as f:
             file = csv.DictReader(f, delimiter=',')
             for line in file:
-                logging.info(f"Processing the authors of the paper: {line['DOI']}")
-                abstract, _pubmed_id, paper_full = __obtain_paper_abstract_and_pubmedid(file_name, line['EID'])
-                __process_paper_authors(line, paper_full, db_authors_new, [], [])
+                paper_db = db_papers.find_record({'DOI': line['DOI']})
+                if paper_db:
+                    logging.info(f"Processing the authors of the paper: {line['DOI']}")
+                    abstract, _pubmed_id, paper_full = __obtain_paper_abstract_and_pubmedid(file_name, line['EID'])
+                    __process_paper_authors(line, paper_full, db_authors, [], [])
 
 
 def check_data_to_insert():
