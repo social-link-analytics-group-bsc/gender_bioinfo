@@ -20,7 +20,7 @@ logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gen
 logging.getLogger('selenium.webdriver.remote.remote_connection').setLevel(logging.ERROR)
 logging.getLogger('googleapiclient.discovery').setLevel(logging.ERROR)
 logging.getLogger('urllib3.connectionpool').setLevel(logging.ERROR)
-logging.getLogger('matplotlib').setLevel(logging.ERROR)
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
 
 def create_author_record(author_name, author_gender, author_index, article, db_authors, author_id=''):
@@ -49,14 +49,18 @@ def create_author_record(author_name, author_gender, author_index, article, db_a
 
 def update_author_record(author_in_db, author_name, author_index, author_gender, article, db_authors):
     if 'dois' in author_in_db.keys():
-        author_in_db['dois'].append(article['DOI'])
         author_dois = author_in_db['dois']
+        if article['DOI'] not in author_dois:
+            author_dois.append(article['DOI'])
+        else:
+            logging.info(f"The DOI was already processed!")
+            return
     else:
         author_dois = [article['DOI']]
     citations = int(article['citations']) if article['citations'] else ''
     if 'citations' in author_in_db.keys():
-        author_in_db['citations'].append(citations)
         author_citations = author_in_db['citations']
+        author_citations.append(citations)
     else:
         author_citations = [citations]
     if 'total_citations' in author_in_db.keys():
@@ -93,11 +97,20 @@ def update_author_record(author_in_db, author_name, author_index, author_gender,
     if author_gender != 'unknown' and author_gender != author_in_db.get('gender'):
         logging.warning(f"Author {author_name}'s with gender inconsistency. "
                         f"Stored {author_in_db.get('gender')}. Article (doi {article['DOI']}) author_gender")
-    db_authors.update_record({'name': author_name}, values_to_update)
+    if 'id' in author_in_db:
+        db_authors.update_record({'id': author_in_db['id']}, values_to_update)
+    else:
+        if author_name:
+            db_authors.update_record({'name': author_name}, values_to_update)
+        else:
+            logging.error(f"The author cannot be updated because there is not a way to identify the record "
+                          f"in the database")
     if author_name:
         logging.info(f"Actualizado author {author_name}")
+    elif 'last_name' in author_in_db:
+        logging.info(f"Actualizado author {author_in_db['last_name']}")
     else:
-        logging.info(f"Actualizado author {author_in_db}")
+        logging.info(f"Actualizado author {author_in_db['id']}")
 
 
 def create_update_paper_authors_collection():
