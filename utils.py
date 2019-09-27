@@ -5,6 +5,7 @@ import logging
 import json
 import re
 import pathlib
+import unicodedata
 
 
 logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gender_identification.log')),
@@ -95,3 +96,7 @@ def get_db_name():
     config_fn = current_dir.joinpath('config.json')
     config = get_config(config_fn)
     return config['mongo']['db_name']
+
+
+def normalize_text(text):
+    return unicodedata.normalize('NFD', text).encode('ascii', 'ignore').decode()
