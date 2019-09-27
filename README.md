@@ -82,14 +82,13 @@ are stored in the database**.
 Scopus does not provide the full name of authors—only the initial of the first (and middle) name and the last name.
 However, the PubMed identifier of the articles is provided by Scopus. We use the PubMed Id of the articles to hit the 
 [API of PubMed](https://www.ncbi.nlm.nih.gov/home/develop/api/) and get information about papers' authors, including 
-their full names. To complete the name of authors, execute from `run.py` the function `...`. The function takes a while
-to complete.
+their full names. To complete the name of authors, execute from `run.py` the function `get_paper_author_names_from_pubmed` 
+in `data_extractor.py`. The function takes a while to complete.
 
 **Gender Identification**. Taking the full name of authors, the API [NamSor](http://api.namsor.com/) is used to infer the
 authors' gender. In case, NamSor fails to identify the gender, the python package [gender-guesser](https://pypi.org/project/gender-guesser/)
 is used to find out the gender of authors. Information on how [NamSor](https://www.namsor.com/) works can be at its 
-website. To compute gender identification, execute from `run.py` the function `...`. Given the large number of names, the function 
-takes a while to complete.
+website.
 
 ## Gender Bias Analysis
 
@@ -101,7 +100,7 @@ The scripts used to conduct all of the gender bias analyses are contained in the
 2. [MongoDB Community Edition](https://www.mongodb.com/download-center#community)—used as data storage repository
 3. [Selenium WebDriver](https://www.seleniumhq.org/projects/webdriver/)—used to resolve papers' DOIs
 4. [Biopython](https://biopython.org/)—PubMed API client
-5. [Jupyter Notebook](https://jupyter.org/)—Data exploration and analysis
+5. [Jupyter Notebook](https://jupyter.org/)—data exploration and analysis
 
 ## Issues
 
