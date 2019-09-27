@@ -1,9 +1,8 @@
-from collections import defaultdict
 from data_wrangler import create_author_record, update_author_record
 from db_manager import DBManager
 from doiorg_client import DoiClient
 from similarity.jarowinkler import JaroWinkler
-from utils import get_db_name
+from utils import get_db_name, normalize_text
 
 import ast
 import csv
@@ -36,7 +35,10 @@ def __affiliations_to_save(affiliations, new_affiliations):
     for new_affiliation in new_affiliations:
         exist_affiliation = False
         for affiliation in affiliations:
-            similarity_score = jarowinkler.similarity(affiliation.lower(), new_affiliation.lower())
+            # normalize text before comparison
+            affiliation_nor = normalize_text(affiliation)
+            new_affiliation_nor = normalize_text(new_affiliation)
+            similarity_score = jarowinkler.similarity(affiliation_nor.lower(), new_affiliation_nor.lower())
             if similarity_score >= similarity_threshold:
                 exist_affiliation = True
         if not exist_affiliation:
@@ -49,8 +51,12 @@ def __get_actual_affiliations(affiliations, author_affiliation):
     author_affiliation = author_affiliation.strip()
     for affiliation in affiliations:
         affiliation = affiliation.strip()
-        if affiliation.lower() in author_affiliation.lower():
-            actual_affiliations.append(affiliation.strip())
+        # normalize text before comparison
+        affiliation_nor = normalize_text(affiliation)
+        author_affiliation_nor = normalize_text(author_affiliation)
+        if affiliation_nor.lower() in author_affiliation_nor.lower():
+            if affiliation:
+                actual_affiliations.append(affiliation.strip())
     return actual_affiliations
 
 
@@ -60,12 +66,11 @@ def __process_paper_authors(paper_summary, paper_full, db_authors, author_names,
     affiliations = paper_full['Affiliations'].split(';')
     paper_doi = paper_summary['DOI']
     paper_citations = paper_summary['Cited by'] if paper_summary['Cited by'] else paper_full['Cited by']
-    author_index = 0
     if author_names:
         it_authors = zip(author_names, author_ids, author_affiliations)
     else:
         it_authors = zip(author_ids, author_affiliations)
-    for full_author in it_authors:
+    for author_index, full_author in enumerate(it_authors):
         author_name, author_last_name = '', ''
         if len(full_author) > 2:
             author_name = full_author[0]
@@ -107,13 +112,12 @@ def __process_paper_authors(paper_summary, paper_full, db_authors, author_names,
             )
             db_authors.update_record({'id': author_id}, {'affiliations': actual_affiliations,
                                                          'last_name': author_last_name})
-        author_index += 1
 
 
 def __obtain_paper_abstract_and_pubmedid(file_name, paper_eid):
     dir_full = pathlib.Path('data', 'processed')
     journal_file_name = dir_full.joinpath(file_name)
-    with open(str(journal_file_name), 'r', encoding='ISO-8859-1') as f:
+    with open(str(journal_file_name), 'r') as f:
         file = csv.DictReader(f, delimiter=',')
         for line in file:
             if line['EID'] == paper_eid:
@@ -135,7 +139,7 @@ def load_data_from_files_into_db(exist_old_db=False, name_old_db=''):
     for file_name in file_names:
         logging.info(f"\nProcessing: {file_name}")
         journal_file_name = dir_summary.joinpath(file_name)
-        with open(str(journal_file_name), 'r', encoding='ISO-8859-1') as f:
+        with open(str(journal_file_name), 'r', encoding='utf-8') as f:
             file = csv.DictReader(f, delimiter=',')
             for line in file:
                 logging.info(f"Processing the paper {line['DOI']}")
@@ -186,6 +190,22 @@ def load_data_from_files_into_db(exist_old_db=False, name_old_db=''):
                 else:
                     logging.info(f"Paper {line['DOI']} already in the database!")
     logging.info(f"\n{num_insertions} new papers were inserted!")
+
+
+def load_author_data_from_scopus_files():
+    db_name = get_db_name()
+    db_authors_new = DBManager('bioinfo_authors', db_name=db_name)
+    dir_summary = pathlib.Path('data', 'raw', 'summary')
+    file_names = sorted(os.listdir(dir_summary))
+    for file_name in file_names:
+        logging.info(f"\nProcessing: {file_name}")
+        journal_file_name = dir_summary.joinpath(file_name)
+        with open(str(journal_file_name), 'r') as f:
+            file = csv.DictReader(f, delimiter=',')
+            for line in file:
+                logging.info(f"Processing the authors of the paper: {line['DOI']}")
+                abstract, _pubmed_id, paper_full = __obtain_paper_abstract_and_pubmedid(file_name, line['EID'])
+                __process_paper_authors(line, paper_full, db_authors_new, [], [])
 
 
 def check_data_to_insert():
