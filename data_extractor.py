@@ -651,30 +651,49 @@ def get_paper_author_names_from_pubmed():
     ec = EntrezClient()
     db_papers = DBManager('bioinfo_papers')
     db_authors = DBManager('bioinfo_authors')
-    authors_db = db_authors.search({})
-    for author_db in authors_db:
-        paper_author = db_papers.find_record({'DOI': author_db['dois'][0]})
+    papers_with_pmid = db_papers.search({'pubmed_id': {'$exists': 1}, 'authors': {'$exists': 0}})
+    papers = [paper_with_pmid for paper_with_pmid in papers_with_pmid]
+    pm_ids = []
+    for paper in papers:
+        pm_ids.append(paper['pubmed_id'])
+    total_ids = len(pm_ids)
+    batch_size = 600 if total_ids > 600 else total_ids
+    total_chuncks = int(round(total_ids / batch_size, 0))
+    start_chunk = 0
+    end_chunk = batch_size
+    for chunk in range(0, total_chuncks):
         try:
-            result = ec.search(f"{paper_author['DOI']}[DOI]", db='pubmed')
-            paper_pubmed = ec.fetch_in_batch_from_history(result['Count'], result['WebEnv'], result['QueryKey'])
-            pm_id = paper_pubmed[0]['MedlineCitation']['PMID']
-            article_meta_data = paper_pubmed[0]['MedlineCitation']['Article']
-            if 'AuthorList' in article_meta_data.keys():
-                logging.info(f"Processing paper {article_meta_data['ArticleTitle']} (PMID: {pm_id})")
-                authors = article_meta_data['AuthorList']
-                paper_authors, gender_authors = [], []
-                for index, author in enumerate(authors):
-                    if 'ForeName' in author.keys():
-                        author_fullname = author['ForeName'] + ' ' + author['LastName']
-                        author_gender = get_gender(author_fullname)
-                        db_authors.update_record({'id': author_db['id']}, {'first_name': author['ForeName'].title(),
-                                                                           'last_name': author['LastName'].title(),
-                                                                           'full_name': author_fullname,
-                                                                           'gender': author_gender})
-                        paper_authors.append(author_fullname)
-                        gender_authors.append(author_gender)
-                db_papers.update_record({'DOI': paper_author['DOI']}, {'authors': paper_authors,
-                                                                       'authors_gender': gender_authors})
+            logging.info(f"Getting information from the chunk {chunk + 1} of papers. {batch_size} papers in the chunk.")
+            results = ec.fetch_in_bulk_from_list(pm_ids[start_chunk:end_chunk])
+            # Process results
+            for result in results:
+                pm_id = result['MedlineCitation']['PMID'] + '.0'
+                article_meta_data = result['MedlineCitation']['Article']
+                if 'AuthorList' in article_meta_data.keys():
+                    paper_db = db_papers.find_record({'pubmed_id': pm_id})
+                    logging.info(f"Processing paper {article_meta_data['ArticleTitle']} (PMID: {pm_id})")
+                    authors = article_meta_data['AuthorList']
+                    paper_authors, gender_authors = [], []
+                    for index, author in enumerate(authors):
+                        if 'ForeName' in author.keys():
+                            author_fullname = author['ForeName'] + ' ' + author['LastName']
+                            author_gender = get_gender(author_fullname)
+                            paper_authors.append(author_fullname)
+                            gender_authors.append(author_gender)
+                            author_id = paper_db['authors_id'][index]
+                            logging.info(f"Updating author with id {author_id}")
+                            db_authors.update_record({'id': author_id},
+                                                     {'first_name': author['ForeName'],
+                                                      'last_name': author['LastName'],
+                                                      'name': author_fullname,
+                                                      'gender': author_gender})
+                    db_papers.update_record({'DOI': paper_db['DOI']},
+                                            {'authors': paper_authors,
+                                             'authors_gender': gender_authors})
+            # Update indexes
+            start_chunk = end_chunk
+            end_chunk += batch_size
+            time.sleep(1)
         except Exception as e:
             logging.error(e)
 
