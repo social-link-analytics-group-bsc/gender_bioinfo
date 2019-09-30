@@ -851,3 +851,20 @@ def standardize_source_name():
     papers_db = db_papers.search({})
     for paper_db in papers_db:
         db_papers.update_record({'DOI': paper_db['DOI']}, {'source': paper_db['source'].title()})
+
+
+def add_author_ids_to_papers():
+    db_papers = DBManager('bioinfo_papers', db_name=get_db_name())
+    dir_summary = pathlib.Path('data', 'raw', 'summary')
+    file_names = sorted(os.listdir(dir_summary))
+    for file_name in file_names:
+        logging.info(f"\nProcessing: {file_name}")
+        journal_file_name = dir_summary.joinpath(file_name)
+        with open(str(journal_file_name), 'r') as f:
+            file = csv.DictReader(f, delimiter=',')
+            for line in file:
+                paper_doi = line['DOI']
+                logging.info(f"Processing paper {paper_doi}")
+                author_ids = [author_id.strip() for author_id in line['Author(s) ID'].split(';')]
+                logging.info(f"Adding the following ids {author_ids} to the paper")
+                db_papers.update_record({'DOI': paper_doi}, {'authors_id': author_ids})
