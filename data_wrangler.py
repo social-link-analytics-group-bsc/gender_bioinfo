@@ -868,3 +868,16 @@ def add_author_ids_to_papers():
                 author_ids = [author_id.strip() for author_id in line['Author(s) ID'].split(';')]
                 logging.info(f"Adding the following ids {author_ids} to the paper")
                 db_papers.update_record({'DOI': paper_doi}, {'authors_id': author_ids})
+
+
+def remove_pubmed_id_prefix():
+    db_papers = DBManager('bioinfo_papers', db_name=get_db_name())
+    papers_db = db_papers.search({})
+    for paper_db in papers_db:
+        paper_doi = paper_db['DOI']
+        if '.0' in paper_db['pubmed_id']:
+            pubmed_id = paper_db['pubmed_id'].split('.')[0]
+        else:
+            pubmed_id = paper_db['pubmed_id']
+        logging.info(f"Processing paper {paper_doi}")
+        db_papers.update_record({'DOI': paper_doi}, {'pubmed_id': pubmed_id})
