@@ -121,7 +121,11 @@ def __obtain_paper_abstract_and_pubmedid(file_name, paper_eid):
         file = csv.DictReader(f, delimiter=',')
         for line in file:
             if line['EID'] == paper_eid:
-                return line['Abstract'], line['PubMed ID'], line
+                if '.0' in line['PubMed ID']:
+                    pubmed_id = line['PubMed ID'].split('.')[0]
+                else:
+                    pubmed_id = line['PubMed ID']
+                return line['Abstract'], pubmed_id, line
     return None, None, None
 
 
