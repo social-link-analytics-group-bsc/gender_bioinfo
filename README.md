@@ -74,7 +74,7 @@ on papers' authors will be recorded in `bioinfo_authors`. This function takes a 
 connects to [DOI resolution](https://dx.doi.org/) to extract link of the papers—links to the papers are not provided 
 by Scopus. The completion time can be sped up by commenting the line #162 in `data_loader.py`.
 
-Duplicated records (194) and entries without DOI (401) are not included in the loading process. **In total, 46,832 records
+Duplicated records (197) and entries without DOI (401) are not included in the loading process. **In total, 46,829 records
 are stored in the database**.
 
 ## Data Processing
@@ -89,6 +89,10 @@ in `data_extractor.py`. The function takes a while to complete.
 authors' gender. In case, NamSor fails to identify the gender, the python package [gender-guesser](https://pypi.org/project/gender-guesser/)
 is used to find out the gender of authors. Information on how [NamSor](https://www.namsor.com/) works can be at its 
 website.
+
+Through this process we found that 266 (0.6%) articles are not in PubMed, so the information about their authors cannot 
+not be obtained. Also, out of 12 articles that have a PubMed identifier, 10 of them are proceedings of conferences, 1
+a PDF with the names of the editorial board of the journal, and for 1 the list of authors are provided via the PubMed API. 
 
 ## Gender Bias Analysis
 
