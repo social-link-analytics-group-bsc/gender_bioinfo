@@ -881,3 +881,47 @@ def remove_pubmed_id_prefix():
             pubmed_id = paper_db['pubmed_id']
         logging.info(f"Processing paper {paper_doi}")
         db_papers.update_record({'DOI': paper_doi}, {'pubmed_id': pubmed_id})
+
+
+def identify_duplicate_pubmed_ids():
+    db_papers = DBManager('bioinfo_papers', db_name=get_db_name())
+    papers_db = db_papers.search({'pubmed_id': {'$ne': ''}})
+    pm_ids = []
+    for paper_db in papers_db:
+        if paper_db['pubmed_id'] not in pm_ids:
+            pm_ids.append(paper_db['pubmed_id'])
+        else:
+            logging.warning(f"The pubmed id {paper_db['pubmed_id']} is duplicated")
+    logging.info(f"Total unique pubmed identifiers {len(pm_ids)}")
+
+
+def check_data_consistency():
+    db_papers = DBManager('bioinfo_papers', db_name=get_db_name())
+    papers_db = db_papers.search({})
+    papers = [paper_db for paper_db in papers_db]
+    total_papers, with_pmid, without_pmid, others = 0, 0, 0, 0
+    for paper in papers:
+        total_papers += 1
+        if paper['pubmed_id'] == '':
+            without_pmid += 1
+        elif paper['pubmed_id'] != '':
+            with_pmid += 1
+        else:
+            others += 1
+    logging.info(f"Total papers (counter): {total_papers}")
+    logging.info(f"Total papers (len): {len(papers)}")
+    logging.info(f"With Pubmed Id: {with_pmid}")
+    logging.info(f"Without Pubmed Id: {without_pmid}")
+    logging.info(f"Other: {others}")
+
+
+def identify_duplicate_dois():
+    db_papers = DBManager('bioinfo_papers', db_name=get_db_name())
+    papers_db = db_papers.search({})
+    dois = []
+    for paper_db in papers_db:
+        if paper_db['DOI'] not in dois:
+            dois.append(paper_db['DOI'])
+        else:
+            logging.warning(f"The DOI {paper_db['DOI']} is duplicated")
+    logging.info(f"Total unique DOIs {len(dois)}")
