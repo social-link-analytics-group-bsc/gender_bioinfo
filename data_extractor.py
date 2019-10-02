@@ -697,6 +697,8 @@ def get_paper_author_names_from_pubmed():
                                                               'last_name': author['LastName'],
                                                               'name': author_fullname,
                                                               'gender': author_gender})
+                                elif 'last_name' not in author.keys():
+                                    pass
                                 else:
                                     continue
                             else:
