@@ -2,7 +2,7 @@ from data_wrangler import create_author_record, update_author_record
 from db_manager import DBManager
 from doiorg_client import DoiClient
 from similarity.jarowinkler import JaroWinkler
-from utils import get_db_name, normalize_text
+from utils import get_db_name, normalize_text, obtain_paper_abstract_and_pubmedid
 
 import ast
 import csv
@@ -114,21 +114,6 @@ def __process_paper_authors(paper_summary, paper_full, db_authors, author_names,
                                                          'last_name': author_last_name})
 
 
-def __obtain_paper_abstract_and_pubmedid(file_name, paper_eid):
-    dir_full = pathlib.Path('data', 'processed')
-    journal_file_name = dir_full.joinpath(file_name)
-    with open(str(journal_file_name), 'r') as f:
-        file = csv.DictReader(f, delimiter=',')
-        for line in file:
-            if line['EID'] == paper_eid:
-                if '.0' in line['PubMed ID']:
-                    pubmed_id = line['PubMed ID'].split('.')[0]
-                else:
-                    pubmed_id = line['PubMed ID']
-                return line['Abstract'], pubmed_id, line
-    return None, None, None
-
-
 def load_data_from_files_into_db(exist_old_db=False, name_old_db=''):
     dc = DoiClient()
     db_name = get_db_name()
@@ -167,7 +152,7 @@ def load_data_from_files_into_db(exist_old_db=False, name_old_db=''):
                         link = dc.get_paper_link_from_doi(line['DOI'])
                         authors = []
                         authors_gender = []
-                    abstract, _pubmed_id, paper_full = __obtain_paper_abstract_and_pubmedid(file_name, line['EID'])
+                    abstract, _pubmed_id, paper_full = obtain_paper_abstract_and_pubmedid(file_name, line['EID'])
                     if not pubmed_id:
                         pubmed_id = _pubmed_id
                     record_to_save = {
