@@ -1,5 +1,6 @@
 from hammock import Hammock as GendreAPI
 
+import csv
 import gender_guesser.detector as gender
 import logging
 import json
@@ -21,7 +22,8 @@ def get_config(config_file):
 
 def curate_author_name(author_raw):
     regex = re.compile('[0-9*]')
-    author_clean = regex.sub('', author_raw).replace(' and ', ' ').rstrip(',').lstrip(',')
+    author_clean = regex.sub('', author_raw).replace(' and ', ' ').replace('.', '').replace('-', ' ').rstrip(',')\
+        .lstrip(',')
     author_clean = ' '.join(author_clean.split())  # remove duplicate whitespaces and newline characters
     return author_clean
 
@@ -100,3 +102,18 @@ def get_db_name():
 
 def normalize_text(text):
     return unicodedata.normalize('NFD', text).encode('ascii', 'ignore').decode()
+
+
+def obtain_paper_abstract_and_pubmedid(file_name, paper_eid):
+    dir_full = pathlib.Path('data', 'processed')
+    journal_file_name = dir_full.joinpath(file_name)
+    with open(str(journal_file_name), 'r') as f:
+        file = csv.DictReader(f, delimiter=',')
+        for line in file:
+            if line['EID'] == paper_eid:
+                if '.0' in line['PubMed ID']:
+                    pubmed_id = line['PubMed ID'].split('.')[0]
+                else:
+                    pubmed_id = line['PubMed ID']
+                return line['Abstract'], pubmed_id, line
+    return None, None, None
