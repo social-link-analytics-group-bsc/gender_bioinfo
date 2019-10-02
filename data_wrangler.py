@@ -2,7 +2,8 @@ from db_manager import DBManager
 from googleapiclient.discovery import build
 from recordlinkage import preprocessing, SortedNeighbourhoodIndex, Compare
 from selenium import webdriver
-from utils import curate_author_name, get_config, get_base_url, load_countries_file, get_gender, get_db_name
+from utils import curate_author_name, get_config, get_base_url, load_countries_file, get_gender, get_db_name, \
+                  obtain_paper_abstract_and_pubmedid, normalize_text
 from similarity.jarowinkler import JaroWinkler
 
 import csv
@@ -925,3 +926,74 @@ def identify_duplicate_dois():
         else:
             logging.warning(f"The DOI {paper_db['DOI']} is duplicated")
     logging.info(f"Total unique DOIs {len(dois)}")
+
+
+def check_consistency_between_author_lists():
+    db_papers = DBManager('bioinfo_papers', db_name=get_db_name())
+    papers_db = db_papers.search({})
+    incosistent_papers = []
+    for paper_db in papers_db:
+        if 'authors' in paper_db:
+            if len(paper_db['authors_id']) > len(paper_db['authors']):
+                logging.info(f"More IDs than names!, doi {paper_db['DOI']}")
+                incosistent_papers.append(paper_db['DOI'])
+            elif len(paper_db['authors_id']) < len(paper_db['authors']):
+                logging.info(f"More names than IDs!, doi {paper_db['DOI']}")
+                incosistent_papers.append(paper_db['DOI'])
+    logging.info(f"There are {len(incosistent_papers)} inconsistent papers. Bellow the list of dois:")
+    for inconsistent_paper in incosistent_papers:
+        logging.info(f"- {inconsistent_paper}")
+
+
+def check_consistency_between_author_id_and_author_record():
+    dir_summary = pathlib.Path('data', 'raw', 'summary')
+    file_names = sorted(os.listdir(dir_summary))
+    db_papers = DBManager('bioinfo_papers', db_name=get_db_name())
+    db_authors = DBManager('bioinfo_authors', db_name=get_db_name())
+    inconsistent_papers, inconsistent_authors, paper_counter = 0, 0, 0
+    for file_name in file_names:
+        logging.info(f"\nProcessing: {file_name}")
+        journal_file_name = dir_summary.joinpath(file_name)
+        with open(str(journal_file_name), 'r', encoding='utf-8') as f:
+            file = csv.DictReader(f, delimiter=',')
+            for line in file:
+                paper_db = db_papers.find_record({'DOI': line['DOI']})
+                if paper_db:
+                    paper_counter += 1
+                    logging.info(f"[{paper_counter}] Processing paper: {paper_db['DOI']}")
+                    author_ids_db = paper_db['authors_id']
+                    author_ids_file = [author_id.strip() for author_id in line['Author(s) ID'].split(';')]
+                    _, _, paper_full = obtain_paper_abstract_and_pubmedid(file_name, line['EID'])
+                    authors_last_name = [aff.split(',')[0] for aff in paper_full['Authors with affiliations'].split(';')]
+                    authors_file = {}
+                    for index, author_id_file in enumerate(author_ids_file):
+                        authors_file[author_id_file] = authors_last_name[index].strip()
+                    found_inconsistency, update_author_ids_paper = False, False
+                    for author_id_file in author_ids_file:
+                        if author_id_file in author_ids_db:
+                            author_db = db_authors.find_record({'id': author_id_file})
+                            last_name_author_db = normalize_text(curate_author_name(author_db['last_name']))
+                            last_name_author_file = normalize_text(curate_author_name(authors_file[author_id_file]))
+                            if last_name_author_db.lower() != last_name_author_file.lower():
+                                logging.info(f"Found inconsistency in author {author_id_file}. \n"
+                                             f"Last name: {last_name_author_db} (DB) - {last_name_author_file} (File).\n"
+                                             f"Corrective actions will be taken.")
+                                found_inconsistency = True
+                                inconsistent_authors += 1
+                                db_authors.update_record({'id': author_id_file},
+                                                         {'last_name': last_name_author_file,
+                                                          'name': '',
+                                                          'gender': ''})
+                                db_authors.remove_field_from_record({'id': author_id_file},
+                                                                    {'first_name': 1})
+                        else:
+                            found_inconsistency = True
+                            update_author_ids_paper = True
+                    if found_inconsistency or update_author_ids_paper:
+                        inconsistent_papers += 1
+                        logging.info(f"The lists of author names and genders will be removed for the paper {paper_db['DOI']}")
+                        db_papers.remove_field_from_record({'DOI': paper_db['DOI']},
+                                                           {'authors': 1, 'authors_gender': 1})
+                        if update_author_ids_paper:
+                            db_papers.update_record({'DOI': paper_db['DOI']}, {'authors_id': author_ids_file})
+    logging.info(f"Inconsistencies: \n\tPapers: {inconsistent_papers}\n\tAuthors: {inconsistent_authors}")
