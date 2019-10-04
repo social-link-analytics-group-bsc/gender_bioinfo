@@ -12,7 +12,7 @@ from db_manager import DBManager
 from pubmed import EntrezClient
 from selenium import webdriver
 from utils import curate_author_name, curate_affiliation_name, load_countries_file, get_gender, title_except, get_config, \
-                  get_base_url
+                  get_base_url, are_names_similar
 from urllib import parse, request
 
 
@@ -647,6 +647,138 @@ def get_paper_authors_from_pubmed(remove_author_field_from_records=False):
             logging.error(e)
 
 
+def __create_paper_authors_dict(db_authors, author_ids):
+    authors_dict = {}
+    authors_last_name = []
+    for author_id in author_ids:
+        author_db = db_authors.find_record({'id': author_id})
+        authors_last_name.append(author_db['last_name'])
+    for i in range(len(authors_last_name)):
+        authors_dict[author_ids[i]] = {'current_last_name': authors_last_name[i]}
+        if i == 0:  # if it is the first, there isn't previous record
+            authors_dict[author_ids[i]]['previous_last_name'] = ''
+        else:
+            authors_dict[author_ids[i]]['previous_last_name'] = authors_last_name[i-1]
+        if i == (len(authors_last_name)-1):  # if it is the last, there isn't next record
+            authors_dict[author_ids[i]]['next_last_name'] = ''
+        else:
+            authors_dict[author_ids[i]]['next_last_name'] = authors_last_name[i+1]
+    return authors_dict
+
+
+def __get_author_id_from_last_name(index_last_name, authors_dict, authors_list, name_part='LastName'):
+    preselect_authors = {}
+    for author_id, author_info in authors_dict.items():
+        if are_names_similar(author_info['current_last_name'], authors_list[index_last_name][name_part],
+                             use_approximation_algorithm=True, similarity_threshold=0.97):
+            preselect_authors[author_id] = author_info
+    if len(preselect_authors) == 1:
+        return list(preselect_authors.items())[0][0]
+    else:
+        if len(preselect_authors) > 1:
+            previous_last_name, next_last_name = '', ''
+            if index_last_name > 0:
+                previous_last_name = authors_list[index_last_name-1][name_part]
+            if index_last_name < (len(authors_list)-1):
+                next_last_name = authors_list[index_last_name+1][name_part]
+            for author_id, author_info in preselect_authors.items():
+                if are_names_similar(author_info['previous_last_name'], previous_last_name,
+                                     use_approximation_algorithm=True, similarity_threshold=0.97) and \
+                   are_names_similar(author_info['next_last_name'], next_last_name, use_approximation_algorithm=True,
+                                     similarity_threshold=0.97):
+                    return author_id
+            # If cannot find coincidence considering both the previous and next names, we will relax a one of the
+            # constraints
+            for author_id, author_info in preselect_authors.items():
+                if are_names_similar(author_info['previous_last_name'], previous_last_name,
+                                     use_approximation_algorithm=True, similarity_threshold=0.97) or \
+                   are_names_similar(author_info['next_last_name'], next_last_name, use_approximation_algorithm=True,
+                                     similarity_threshold=0.97):
+                    return author_id
+            raise Exception(f"Could not find the id of the author {authors_list[index_last_name][name_part]} in "
+                            f"{preselect_authors}")
+        else:
+            return None
+
+
+def __check_correctness_author_list(existing_list_ids, author_list_to_save, gender_list_to_save, db_authors):
+    for index, author_id in enumerate(existing_list_ids):
+        author_db = db_authors.find_record({'id': author_id})
+        found_author = False
+        for author in author_list_to_save:
+            if author_db['last_name'] in author:
+                found_author = True
+                break
+        if not found_author:
+            author_list = author_list_to_save[0:index]
+            author_list[index] = author_db['name'] if author_db['name'] else author_db['last_name']
+            author_list.extend(author_list_to_save[index+1:len(author_list_to_save)])
+            author_list_to_save = author_list
+            gender_list = gender_list_to_save[0:index]
+            gender_list[index] = author_db['gender'] if author_db['gender'] else 'unknown'
+            gender_list.extend(gender_list_to_save[index + 1:len(gender_list_to_save)])
+            gender_list_to_save = gender_list
+    return author_list_to_save, gender_list_to_save
+
+
+def __create_author(author, paper_db, index, tot_authors_pubmed, db_authors):
+    author_id = str(author['Identifier'][0])
+    create_author_record(
+        author_name='',
+        author_gender='',
+        author_index=index,
+        article={'DOI': paper_db['DOI'], 'citations': paper_db['citations']},
+        db_authors=db_authors,
+        author_id=author_id
+    )
+    affiliations = []
+    for affiliation in author['AffiliationInfo']:
+        affiliations.append(affiliation['Affiliation'])
+    db_authors.update_record({'id': author_id},
+                             {'affiliations': affiliations,
+                              'last_name': author['LastName']})
+    if index == 0:
+        former_first_author = db_authors.find_record({'id': paper_db['authors_id'][index]})
+        if former_first_author['papers_as_first_author'] > 0:
+            former_first_author['papers_as_first_author'] -= 1
+            db_authors.update_record({'id': paper_db['authors_id'][index]},
+                                     {'papers_as_first_author':
+                                          former_first_author['papers_as_first_author']})
+    if index == (tot_authors_pubmed - 1):
+        former_last_author = db_authors.find_record({'id': paper_db['authors_id'][index]})
+        if former_last_author['papers_as_last_author'] > 0:
+            former_last_author['papers_as_last_author'] -= 1
+            db_authors.update_record({'id': paper_db['authors_id'][index]},
+                                     {'papers_as_last_author':
+                                          former_last_author['papers_as_last_author']})
+    return db_authors.find_record({'id': author_id})
+
+
+def __get_author_from_authorlist(author_info, author_list, name_part):
+    for index, author in enumerate(author_list):
+        if 'CollectiveName' in author:
+            continue
+        if name_part in author:
+            if are_names_similar(author_info['current_last_name'], author[name_part],
+                                 use_approximation_algorithm=True, similarity_threshold=0.97):
+                similar_previous, similar_next = True, True
+                if index > 0:
+                    similar_previous = are_names_similar(author_info['previous_last_name'],
+                                                         author_list[index-1][name_part],
+                                                         use_approximation_algorithm=True,
+                                                         similarity_threshold=0.97)
+                if index < (len(author_list)-1):
+                    similar_next = are_names_similar(author_info['next_last_name'],
+                                                         author_list[index + 1][name_part],
+                                                         use_approximation_algorithm=True,
+                                                         similarity_threshold=0.97)
+                if similar_previous or similar_next:
+                    return author
+                else:
+                    return None
+    return None
+
+
 def get_paper_author_names_from_pubmed():
     ec = EntrezClient()
     db_papers = DBManager('bioinfo_papers')
@@ -656,13 +788,14 @@ def get_paper_author_names_from_pubmed():
     pm_ids = []
     for paper in papers:
         pm_ids.append(paper['pubmed_id'])
+    pm_ids = ['20550715']
     total_ids = len(pm_ids)
     batch_size = 600 if total_ids > 600 else total_ids
-    total_chuncks = int(round(total_ids / batch_size, 0))
+    total_chunks = int(round(total_ids / batch_size, 0))
     start_chunk = 0
     end_chunk = batch_size
     num_processed_papers = 0
-    for chunk in range(0, total_chuncks):
+    for chunk in range(0, total_chunks):
         try:
             logging.info(f"Getting information from the chunk {chunk + 1} of papers. {batch_size} papers in the chunk.")
             results = ec.fetch_in_bulk_from_list(pm_ids[start_chunk:end_chunk])
@@ -673,18 +806,82 @@ def get_paper_author_names_from_pubmed():
                 article_meta_data = result['MedlineCitation']['Article']
                 if 'AuthorList' in article_meta_data.keys():
                     paper_db = db_papers.find_record({'pubmed_id': pm_id})
-                    logging.info(f"[{num_processed_papers}/{total_ids}] Processing paper {article_meta_data['ArticleTitle']} (PMID: {pm_id})")
+                    logging.info(f"[{num_processed_papers}/{total_ids}] Processing paper "
+                                 f"{article_meta_data['ArticleTitle']} (PMID: {pm_id})")
+                    paper_dict = {'author_ids': [], 'author_names': [], 'author_genders': []}
                     authors = article_meta_data['AuthorList']
-                    paper_authors, gender_authors = [], []
+                    author_ids = paper_db['authors_id']
+                    authors_dict = __create_paper_authors_dict(db_authors, author_ids)
+                    for author_id in author_ids:
+                        paper_dict['author_ids'].append(author_id)
+                        author_db = db_authors.find_record({'id': author_id})
+                        if author_db['first_name']:
+                            paper_dict['author_names'].append(author_db['full_name'])
+                            paper_dict['author_genders'].append(author_db['gender'])
+                        else:
+                            author_pubmed = __get_author_from_authorlist(authors_dict[author_id], authors, 'LastName')
+                            if not author_pubmed:
+                                author_pubmed = __get_author_from_authorlist(authors_dict[author_id], authors, 'ForeName')
+                            if author_pubmed:
+                                if 'ForeName' in author_pubmed:
+                                    author_fullname = author_pubmed['ForeName'] + ' ' + author_pubmed['LastName']
+                                    author_gender = get_gender(author_fullname)
+                                    logging.info(f"Updating author with id {author_id}")
+                                    db_authors.update_record({'id': author_id},
+                                                             {'first_name': author_pubmed['ForeName'],
+                                                              'last_name': author_pubmed['LastName'],
+                                                              'name': author_fullname,
+                                                              'gender': author_gender})
+                                    paper_dict['author_names'].append(author_fullname)
+                                    paper_dict['author_gender'].append(author_gender)
+                                elif 'LastName' in author_pubmed:
+                                    paper_dict['author_names'].append(author_pubmed['LastName'])
+                                    paper_dict['author_gender'].append('unknown')
+                            else:
+                                paper_dict['author_names'].append(author_db['last_name'])
+                                paper_dict['author_gender'].append('unknown')
+                                logging.warning(f"Could not find the author "
+                                                f"{authors_dict[author_id]['current_last_name']}"
+                                                f"within the lists of pubmed authors"
+                                                f"{authors}")
+
+
+
+                    paper_author_ids, paper_authors, gender_authors = [], [], []
+                    created_author = False
                     index = 0
+                    total_authors_pubmed = len(authors)
                     for author in authors:
                         if 'CollectiveName' in author:
                             continue
                         if index >= len(paper_db['authors_id']):
                             break
-                        author_id = paper_db['authors_id'][index]
-                        author_db = db_authors.find_record({'id': author_id})
+                        author_id = __get_author_id_from_last_name(index, authors_dict, authors)
+                        if author_id:
+                            author_db = db_authors.find_record({'id': author_id})
+                        else:
+                            if 'ForeName' in author:
+                                author_id = __get_author_id_from_last_name(index, authors_dict, authors, 'ForeName')
+                                if author_id:
+                                    author_db = db_authors.find_record({'id': author_id})
+                                else:
+                                    # Limitation: since we could not find the id through the defined methods, so we
+                                    # assume that the id that we are looking for is the located in the position
+                                    # indicated by index
+                                    author_db = db_authors.find_record({'id': paper_db['authors_id'][index]})
+                                    if are_names_similar(author_db['last_name'], author['LastName'],
+                                                         use_approximation_algorithm=True):
+                                        author_id = paper_db['authors_id'][index]
+                                    else:
+                                        author_db = __create_author(author, paper_db, index, total_authors_pubmed,
+                                                                    db_authors)
+                                        created_author = True
+                            else:
+                                # Add the author because authors were missing in the author list of some Scopus records
+                                author_db = __create_author(author, paper_db, index, total_authors_pubmed, db_authors)
+                                created_author = True
                         if author_db:
+                            paper_author_ids.append(author_id)
                             if 'first_name' not in author_db:
                                 if 'ForeName' in author.keys():
                                     author_fullname = author['ForeName'] + ' ' + author['LastName']
@@ -697,19 +894,30 @@ def get_paper_author_names_from_pubmed():
                                                               'last_name': author['LastName'],
                                                               'name': author_fullname,
                                                               'gender': author_gender})
-                                elif 'last_name' not in author.keys():
-                                    pass
+                                elif 'LastName' in author.keys():
+                                    paper_authors.append(author_db['last_name'])
+                                    gender_authors.append('unknown')
                                 else:
-                                    continue
+                                    raise Exception(f"Unrecognized pubmed author record {author}")
                             else:
                                 paper_authors.append(author_db['name'])
                                 gender_authors.append(author_db['gender'])
                         else:
                             raise Exception(f"Author with id {author_id} does not exist!")
                         index += 1
-                    db_papers.update_record({'_id': paper_db['_id']},
-                                            {'authors': paper_authors,
-                                             'authors_gender': gender_authors})
+                    paper_authors, gender_authors = __check_correctness_author_list(paper_db['authors_id'],
+                                                                                    paper_authors, gender_authors,
+                                                                                    db_authors)
+                    logging.info(f"Updating paper {paper_db['DOI']}")
+                    if created_author:
+                        db_papers.update_record({'_id': paper_db['_id']},
+                                                {'authors': paper_authors,
+                                                 'authors_gender': gender_authors,
+                                                 'authors_id': paper_author_ids})
+                    else:
+                        db_papers.update_record({'_id': paper_db['_id']},
+                                                {'authors': paper_authors,
+                                                 'authors_gender': gender_authors})
             # Update indexes
             start_chunk = end_chunk
             end_chunk += batch_size
