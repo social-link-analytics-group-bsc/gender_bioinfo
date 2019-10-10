@@ -997,3 +997,9 @@ def check_consistency_between_author_id_and_author_record():
                         if update_author_ids_paper:
                             db_papers.update_record({'DOI': paper_db['DOI']}, {'authors_id': author_ids_file})
     logging.info(f"Inconsistencies: \n\tPapers: {inconsistent_papers}\n\tAuthors: {inconsistent_authors}")
+
+
+def set_empty_genders_to_unknown():
+    db_authors = DBManager('bioinfo_authors', db_name=get_db_name())
+    ret = db_authors.update_records({'gender':''}, {'gender': 'unknown'})
+    logging.info(f"Updated {ret.modified_count} records")
