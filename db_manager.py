@@ -41,6 +41,9 @@ class DBManager:
         return self.__db[self.__collection].update_one(filter_query, {'$set': new_values},
                                                        upsert=create_if_doesnt_exist)
 
+    def update_records(self, filter_query, new_values):
+        return self.__db[self.__collection].update_many(filter_query, {'$set': new_values})
+
     def update_all_records(self, new_values):
         return self.__db[self.__collection].update_many({}, {'$set': new_values})
 
