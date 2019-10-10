@@ -91,7 +91,7 @@ is used to find out the gender of authors. Information on how [NamSor](https://w
 website.
 
 Through this process we found that 266 (0.6%) articles are not in PubMed, so the information about their authors cannot 
-not be obtained. Also, out of 12 articles that have a PubMed identifier, 10 of them are proceedings of conferences, 1
+not be obtained. Also, of 12 articles that have a PubMed identifier, 10 of them are proceedings of conferences, 1
 a PDF with the names of the editorial board of the journal, and for 1 the list of authors are provided via the PubMed API. 
 
 ## Gender Bias Analysis
