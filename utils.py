@@ -1,4 +1,5 @@
 from hammock import Hammock as GendreAPI
+from similarity.jarowinkler import JaroWinkler
 
 import csv
 import gender_guesser.detector as gender
@@ -117,3 +118,18 @@ def obtain_paper_abstract_and_pubmedid(file_name, paper_eid):
                     pubmed_id = line['PubMed ID']
                 return line['Abstract'], pubmed_id, line
     return None, None, None
+
+
+def are_names_similar(name_1, name_2, use_approximation_algorithm=False, similarity_threshold=0.95):
+    if name_1 == '' and name_2 == '':
+        return True
+    if (name_1 == '' and name_2 != '') or (name_1 != '' and name_2 == ''):
+        return False
+    c_name_1 = normalize_text(curate_author_name(name_1)).lower()
+    c_name_2 = normalize_text(curate_author_name(name_2)).lower()
+    if use_approximation_algorithm:
+        jarowinkler = JaroWinkler()
+        similarity_score = jarowinkler.similarity(c_name_1, c_name_2)
+        return similarity_score > similarity_threshold
+    else:
+        return c_name_1 == c_name_2
