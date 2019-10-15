@@ -107,11 +107,11 @@ class EntrezClient:
 
 
 #if __name__ == '__main__':
-    # ec = EntrezClient()
-    # db = 'pubmed'
-    # results = ec.search('10.1093/bioinformatics/btu533[DOI]', db=db)
+#    ec = EntrezClient()
+#    db = 'pubmed'
+#    results = ec.search('10.1093/bioinformatics/btl003[DOI]', db=db)
     # results = ec.search('10.1371/journal.pcbi.1002834[DOI]', db=db)
-    # paper = ec.fetch_in_batch_from_history(results['Count'], results['WebEnv'], results['QueryKey'], db='pmc')
+#    paper = ec.fetch_in_batch_from_history(results['Count'], results['WebEnv'], results['QueryKey'])
     # id_to_search = results['IdList'][0]
     # paper = ec.fetch_in_bulk_from_list([id_to_search], db=db)
-    # print('Done!')
+#    print('Done!')
