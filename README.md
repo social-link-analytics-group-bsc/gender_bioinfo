@@ -90,9 +90,21 @@ authors' gender. In case, NamSor fails to identify the gender, the python packag
 is used to find out the gender of authors. Information on how [NamSor](https://www.namsor.com/) works can be at its 
 website.
 
-Through this process we found that 266 (0.6%) articles are not in PubMed, so the information about their authors cannot 
-not be obtained. Also, of 12 articles that have a PubMed identifier, 10 of them are proceedings of conferences, 1
-a PDF with the names of the editorial board of the journal, and for 1 the list of authors are provided via the PubMed API. 
+Through this process we found that 266 articles (0.6%) are not in PubMed, so the information about their authors could 
+not be obtained from this source. For different reasons, we could not get information of 12 articles that have PubMed 
+identifier. Ten of them are proceedings of conferences, 1 is a PDF with the names of the editorial board of the journal,
+and 1 does not have author list.
+
+We could not get information of 2626 authors (0.18%). In some case, Scopus does not provide the last name specifying the 
+situation with an empty string or with the text *[No author name available]*. In some other cases, there were 
+inconsistencies between the list of authors provided by Scopus and the list of authors obtained from PubMed. This is the
+case of articles in which organizations appear as part of the author list. Here, PubMed mentions the organization name 
+while Scopus present the name of the organization's members that participated in the article. We also found PubMed 
+registries with the first and last name inverted. These registries could not be automatically matched.
+
+In total, the gender of 27708 authors (19%) could be detected by not either of the two gender identification services. 
+In 10% of the cases, the gender could not be identified because we could not get the author names from PubMed. For the 
+rest, we saw that the identification services has problems with asian names.
 
 ## Gender Bias Analysis
 
