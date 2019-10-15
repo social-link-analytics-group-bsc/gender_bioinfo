@@ -133,3 +133,15 @@ def are_names_similar(name_1, name_2, use_approximation_algorithm=False, similar
         return similarity_score > similarity_threshold
     else:
         return c_name_1 == c_name_2
+
+
+def get_similarity_score(name_1, name_2):
+    if name_1 == '' and name_2 == '':
+        return 1
+    if (name_1 == '' and name_2 != '') or (name_1 != '' and name_2 == ''):
+        return 0
+    c_name_1 = normalize_text(curate_author_name(name_1)).lower()
+    c_name_2 = normalize_text(curate_author_name(name_2)).lower()
+    jarowinkler = JaroWinkler()
+    similarity_score = jarowinkler.similarity(c_name_1, c_name_2)
+    return similarity_score
