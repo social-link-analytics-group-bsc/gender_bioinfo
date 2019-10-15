@@ -12,7 +12,7 @@ from db_manager import DBManager
 from pubmed import EntrezClient
 from selenium import webdriver
 from utils import curate_author_name, curate_affiliation_name, load_countries_file, get_gender, title_except, get_config, \
-                  get_base_url, are_names_similar
+                  get_base_url, are_names_similar, get_similarity_score
 from urllib import parse, request
 
 
@@ -755,33 +755,37 @@ def __create_author(author, paper_db, index, tot_authors_pubmed, db_authors):
 
 
 def __get_author_from_authorlist(author_info, author_list, name_part):
+    current_similarity_threshold = 0.95
+    next_similarity_threshold, previous_similarity_threshold = 0.97, 0.97
     for index, author in enumerate(author_list):
         if 'CollectiveName' in author:
             continue
         if name_part in author:
-            if are_names_similar(author_info['current_last_name'], author[name_part],
-                                 use_approximation_algorithm=True, similarity_threshold=0.97):
-                similar_previous, similar_next = True, True
-                for i in range(1, index):
-                    if index-i >= 0:
-                        if name_part in author_list[index-i]:
-                            similar_previous = are_names_similar(author_info['previous_last_name'],
-                                                                 author_list[index-i][name_part],
-                                                                 use_approximation_algorithm=True,
-                                                                 similarity_threshold=0.97)
-                            break
-                for i in range(1, len(author_list)-(index+1)):
-                    if index <= (len(author_list)-1):
-                        if name_part in author_list[index+i]:
-                            similar_next = are_names_similar(author_info['next_last_name'],
-                                                                 author_list[index + i][name_part],
-                                                                 use_approximation_algorithm=True,
-                                                                 similarity_threshold=0.97)
-                            break
-                if similar_previous or similar_next:
+            # get similarity score of current authors
+            current_similarity_score = get_similarity_score(author_info['current_last_name'], author[name_part])
+            # get similarity score of previous authors
+            previous_name = ''
+            for i in range(index-1, -1, -1):
+                if name_part in author_list[i]:
+                    previous_name = author_list[i][name_part]
+                    break
+            previous_similarity_score = get_similarity_score(author_info['previous_last_name'], previous_name)
+            # get similarity score of next authors
+            next_name = ''
+            for i in range(index+1, len(author_list)):
+                if name_part in author_list[i]:
+                    next_name = author_list[i][name_part]
+                    break
+            next_similarity_score = get_similarity_score(author_info['next_last_name'], next_name)
+            if current_similarity_score > current_similarity_threshold:
+                if (previous_similarity_score > previous_similarity_threshold) or \
+                   (next_similarity_score > next_similarity_threshold):
                     return author
-                else:
-                    return None
+            else:
+                if current_similarity_score > 0.5:
+                    if (previous_similarity_score > previous_similarity_threshold) and \
+                       (next_similarity_score > next_similarity_threshold):
+                        return author
     return None
 
 
@@ -789,12 +793,19 @@ def get_paper_author_names_from_pubmed():
     ec = EntrezClient()
     db_papers = DBManager('bioinfo_papers')
     db_authors = DBManager('bioinfo_authors')
-    papers_with_pmid = db_papers.search({'pubmed_id': {'$exists': 1}, 'authors': {'$exists': 0}})
+    #papers_with_pmid = db_papers.search({'pubmed_id': {'$exists': 1}, 'authors': {'$exists': 0}})
+    authors_with_unknown_gender = db_authors.search({'gender': 'unknown', 'first_name': {'$exists': 0}})
+    dois = []
+    for author in authors_with_unknown_gender:
+        dois.extend(author['dois'])
+    unique_dois = list(set(dois))
+    papers_with_pmid = db_papers.search({'DOI': {'$in': unique_dois}, 'pubmed_id': {'$exists': 1}})
     papers = [paper_with_pmid for paper_with_pmid in papers_with_pmid]
     pm_ids = []
     for paper in papers:
         if paper['pubmed_id']:
             pm_ids.append(paper['pubmed_id'])
+    pm_ids = ['19289446']
     total_ids = len(pm_ids)
     batch_size = 600 if total_ids > 600 else total_ids
     total_chunks = int(round(total_ids / batch_size, 0))
