@@ -196,7 +196,7 @@ def load_author_data_from_scopus_files():
                 paper_db = db_papers.find_record({'DOI': line['DOI']})
                 if paper_db:
                     logging.info(f"Processing the authors of the paper: {line['DOI']}")
-                    abstract, _pubmed_id, paper_full = __obtain_paper_abstract_and_pubmedid(file_name, line['EID'])
+                    abstract, _pubmed_id, paper_full = obtain_paper_abstract_and_pubmedid(file_name, line['EID'])
                     __process_paper_authors(line, paper_full, db_authors, [], [])
 
 
