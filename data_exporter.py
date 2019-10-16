@@ -64,7 +64,6 @@ def export_author_papers(filename):
     db_papers = DBManager('bioinfo_papers')
     db_authors = DBManager('bioinfo_authors')
     papers = db_papers.search({})
-    authors_without_del_flag = [author['name'] for author in db_authors.get_name_authors_without_del_flag()]
     current_dir = pathlib.Path(__file__).parents[0]
     fn = current_dir.joinpath('data', filename)
     logging.info('Exporting data of papers and authors, please wait...')
@@ -84,32 +83,19 @@ def export_author_papers(filename):
             if paper_authors:
                 for idx in range(0, len(paper_authors)):
                     author_name = paper_authors[idx]
-                    include_record = False
-                    if paper_authors[idx] not in authors_without_del_flag:
-                        author_db = db_authors.find_record({'other_names': {'$in': [paper_authors[idx]]}})
-                        if author_db is None:
-                            logging.info(f"The author {paper_authors[idx]} contains the delete flag so it won't be "
-                                         f"exported")
-                        else:
-                            if 'delete' not in author_db:
-                                author_name = author_db['name']
-                                include_record = True
-                    else:
-                        include_record = True
-                    if include_record:
-                        # Only include authors without the delete flag
-                        record_counter += 1
-                        record_to_save = {
-                            'id': record_counter,
-                            'title': paper['title'],
-                            'doi': paper['DOI'],
-                            'year': paper['year'],
-                            'category': paper['edamCategory'],
-                            'author': author_name,
-                            'author_gender': authors_gender[idx],
-                            'author_position': idx+1
-                        }
-                        writer.writerow(record_to_save)
+                    # Only include authors without the delete flag
+                    record_counter += 1
+                    record_to_save = {
+                        'id': record_counter,
+                        'title': paper['title'],
+                        'doi': paper['DOI'],
+                        'year': paper['year'],
+                        'category': paper['edamCategory'],
+                        'author': author_name,
+                        'author_gender': authors_gender[idx],
+                        'author_position': idx+1
+                    }
+                    writer.writerow(record_to_save)
             else:
                 print(f"Paper: {paper['title']} does not have authors")
     logging.info(f"It was exported {papers_counter} papers")
