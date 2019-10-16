@@ -1003,3 +1003,11 @@ def set_empty_genders_to_unknown():
     db_authors = DBManager('bioinfo_authors', db_name=get_db_name())
     ret = db_authors.update_records({'gender':''}, {'gender': 'unknown'})
     logging.info(f"Updated {ret.modified_count} records")
+
+
+def standardize_genders():
+    db_authors = DBManager('bioinfo_authors', db_name=get_db_name())
+    ret = db_authors.update_records({'gender': 'mostly_male'}, {'gender': 'male'})
+    logging.info(f"Updated {ret.modified_count} records")
+    ret = db_authors.update_records({'gender': 'mostly_female'}, {'gender': 'female'})
+    logging.info(f"Updated {ret.modified_count} records")
