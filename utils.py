@@ -68,6 +68,10 @@ def get_gender(full_name):
             # if the main api returns unknown gender, try with another api
             author_gender = gendre_api2.get_gender(first_name)
             author_gender = 'unknown' if author_gender == 'andy' else author_gender
+        if author_gender == 'mostly_male':
+            author_gender = 'male'
+        if author_gender == 'mostly_female':
+            author_gender = 'female'
         return author_gender
     except:
         return 'error_api'
