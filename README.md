@@ -55,7 +55,7 @@ from Scopus.
 
 ## Data Pre-Processing
 
-From `run.py` execute the function `combine_csv_files` in `data_wrangler.py` to combine the files in `data/raw/full` 
+From `run.py` execute the function `combine_csv_files` in `data_wrangler.py` to combine files in `data/raw/full` 
 into one CSV file per journal. The resulting files will be stored in `data/processed` (you might need to create the
 folder *`processed`* inside *`data`* before running the function)
 
@@ -90,7 +90,7 @@ database**. The distribution of  duplicated articles and articles without DOI pe
 
 Scopus does not provide the full name of authors—only the initial of the first (and middle) name and the last name.
 However, the PubMed identifier of the articles is provided by Scopus. We use the PubMed Id of the articles to hit the 
-[API of PubMed](https://www.ncbi.nlm.nih.gov/home/develop/api/) and get information about papers' authors, including 
+[API of PubMed](https://www.ncbi.nlm.nih.gov/home/develop/api/) and get information about the papers' authors, including 
 their full names. To complete the name of authors, execute from `run.py` the function `get_paper_author_names_from_pubmed` 
 in `data_extractor.py`. The function takes a while to complete.
 
@@ -117,13 +117,35 @@ rest, we found that the identification services has problems with asian names.
 
 ## Data Export
 
-Before running the analyses, data are exported to tabular format and saved into CSV files.   
+Before running the analyses, data are exported to tabular format and saved into CSV files. Data about papers can be
+exported to a CSV by running the the function `export_db_into_file` included in `data_exporter.py`. The function 
+receives as parameters, the name of the CSV file, the database from where to extract the data, and the fields to be 
+extracted. The following code snippet shows an example of how to export data about papers into the CSV file `paper.csv`,
+which will be saved in the directory `data`.
+
+```python
+from data_exporter import export_db_into_file
+from db_manager import DBManager
+from utils import get_db_name
+    
+db_papers = DBManager('bioinfo_papers', db_name=get_db_name())
+fields_to_export = ['title', 'DOI', 'year', 'source', 'citations', 
+                    'edamCategory', 'link', 'authors', 
+                    'gender_last_author']
+export_db_into_file('papers.csv', db_papers, fields_to_export)
+```  
+
+In the same manner information about authors can be exported to a CSV file. The function `export_author_papers` in 
+`data_exported.py` creates a CSV that registers the cartesian product between papers and authors. The resulting file
+is saved into the directory `data`.
+
+**All of the above steps can be entirely reproduced by running `run.py`** 
 
 ## Gender Bias Analysis
 
-Various analyses have been conducted on the 46,832 articles and 143,738 authors that ended up in the final dataset.
-The scripts used to conduct all of the gender bias analyses are contained in the Jupyter notebook 
-`analysis/gender_bias_analysis.ipynb` 
+Using the CSV files created by exporting data of authors and papers, we have conducted various 
+analyses. The scripts employed to conduct all of them are contained in the notebook 
+`analysis/gender_bias_analysis.ipynb`. 
  
 ## Technologies
 
