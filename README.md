@@ -74,8 +74,17 @@ on papers' authors will be recorded in `bioinfo_authors`. This function takes a 
 connects to [DOI resolution](https://dx.doi.org/) to extract link of the papers—links to the papers are not provided 
 by Scopus. The completion time can be sped up by commenting the line #162 in `data_loader.py`.
 
-Duplicated records (197) and entries without DOI (401) are not included in the loading process. **In total, 46,829 records
-are stored in the database**.
+Duplicated records (194) and entries without DOI (401) are not stored. **In total, 46,832 records are stored in the 
+database**. The distribution of  duplicated articles and articles without DOI per journal is shown in the next table.
+
+| Journal                    | Duplicates|Missing DOIs|
+|----------------------------|-----------|------------|
+| Oxford Bioinformatics      | 79        |  1         |
+| Plos Computational Biology | 0         |  11        |
+| Nucleic Acids Research     | 12        |  169       |
+| BMC Bioinformatics         | 76        |  100       |
+| BMC Genomics               | 27        |  120       |
+| **Total**                  | 194       |  401       |
 
 ## Data Processing
 
@@ -90,25 +99,31 @@ authors' gender. In case, NamSor fails to identify the gender, the python packag
 is used to find out the gender of authors. Information on how [NamSor](https://www.namsor.com/) works can be at its 
 website.
 
-Through this process we found that 266 articles (0.6%) are not in PubMed, so the information about their authors could 
-not be obtained from this source. For different reasons, we could not get information of 12 articles that have PubMed 
-identifier. Ten of them are proceedings of conferences, 1 is a PDF with the names of the editorial board of the journal,
-and 1 does not have author list.
+Through this process we find that 266 articles (0.6%) are not in PubMed, so the information about their authors cannot 
+be obtained from this source. For different reasons, we cannot get information of 12 articles that have PubMed identifier. 
+Ten of them are proceedings of conferences, 1 is a PDF with the names of the editorial board of the journal, and 1 does 
+not have author list.
 
-We could not get information of 2626 authors (0.18%). In some case, Scopus does not provide the last name specifying the 
-situation with an empty string or with the text *[No author name available]*. In some other cases, there were 
+We cannot get information of 2,626 authors (0.18%). In some case, Scopus does not provide the last name specifying the 
+situation with an empty string or with the text *[No author name available]*. In some other cases, there are 
 inconsistencies between the list of authors provided by Scopus and the list of authors obtained from PubMed. This is the
 case of articles in which organizations appear as part of the author list. Here, PubMed mentions the organization name 
-while Scopus present the name of the organization's members that participated in the article. We also found PubMed 
-registries with the first and last name inverted. These registries could not be automatically matched.
+while Scopus present the name of the organization's members that authored the article. We also found PubMed 
+registries with the first and last name inverted. These registries cannot be automatically matched.
 
-In total, the gender of 27708 authors (19%) could be detected by not either of the two gender identification services. 
-In 10% of the cases, the gender could not be identified because we could not get the author names from PubMed. For the 
-rest, we saw that the identification services has problems with asian names.
+In total, the gender of 27,708 authors (19%) cannot be detected by not either of the two gender identification services. 
+In 10% of the cases, the gender cannot be identified because we cannot get the author name from PubMed. For the 
+rest, we found that the identification services has problems with asian names.
+
+## Data Export
+
+Before running the analyses, data are exported to tabular format and saved into CSV files.   
 
 ## Gender Bias Analysis
 
-The scripts used to conduct all of the gender bias analyses are contained in the Jupyter notebook `analysis/gender_bias_analysis.ipynb` 
+Various analyses have been conducted on the 46,832 articles and 143,738 authors that ended up in the final dataset.
+The scripts used to conduct all of the gender bias analyses are contained in the Jupyter notebook 
+`analysis/gender_bias_analysis.ipynb` 
  
 ## Technologies
 
@@ -120,7 +135,8 @@ The scripts used to conduct all of the gender bias analyses are contained in the
 
 ## Issues
 
-Please use [Github's issue tracker](https://github.com/ParticipaPY/politic-bots/issues/new) to report issues and suggestions.
+Please use [Github's issue tracker](https://github.com/ParticipaPY/politic-bots/issues/new) to report issues and 
+suggestions.
 
 ## Contributors
 
