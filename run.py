@@ -1,10 +1,9 @@
-
-from data_extractor import extra_data_untrackable_journals, obtain_author_gender, get_authors_ncbi_journal, \
-                           obtain_author_affiliation, obtain_affiliation_from_author
-from data_loader import load_data_from_file_into_db, update_data_from_file
-from data_wrangler import create_update_paper_authors_collection, compute_authors_h_index, clean_author_countries
-from data_exporter import export_db_into_file
 from db_manager import DBManager
+from data_extractor import get_paper_author_names_from_pubmed
+from data_loader import load_data_from_files_into_db
+from data_wrangler import combine_csv_files
+from data_exporter import export_db_into_file, export_author_papers
+from utils import get_db_name
 
 import logging
 import pathlib
@@ -14,20 +13,32 @@ logging.basicConfig(filename=str(pathlib.Path(__file__).parents[0].joinpath('gen
 
 
 if __name__ == '__main__':
-    db_papers = DBManager('bioinfo_papers')
-    db_authors = DBManager('bioinfo_authors')
-    # load_data_from_file_into_db('biolitmap_data.csv')
-    # extra_data_untrackable_journals(db)
-    # create_paper_authors_collection(db)
-    # compute_authors_h_index()
-    # update_data_from_file('genero_journals.csv')
-    # get_authors_ncbi_journal(db)
-    # obtain_author_gender(db)
-    # create_update_paper_authors_collection(db)
-    # compute_authors_h_index()
-    # obtain_author_affiliation(db_papers, db_authors)
-    obtain_affiliation_from_author(db_papers, db_authors)
-    #clean_author_countries()
-    #export_db_into_file('bioinfo_authors.csv', db_authors, ['name', 'gender', 'papers', 'total_citations',
-    #                                                        'papers_as_first_author', 'papers_with_citations',
-    #                                                        'h-index', 'countries'])
+    # 1. Combine files in data/raw/full into one CSV file per journal
+    logging.info('Combining files...')
+    combine_csv_files()
+
+    # 2.Load the data in data/raw/summary and data/processed into the database
+    logging.info('Loading data from files...')
+    load_data_from_files_into_db()
+
+    # 3. Get information about the papers' authors, including their full names and gender
+    logging.info('Getting full name and gender of authors...')
+    get_paper_author_names_from_pubmed()
+
+    # 4. Export data of papers to CSV
+    logging.info('Exporting data of papers to data/papers.csv ...')
+    db_papers = DBManager('bioinfo_papers', db_name=get_db_name())
+    fields_to_export = ['title', 'DOI', 'year', 'source', 'citations', 'edamCategory',
+                        'link', 'authors', 'gender_last_author']
+    export_db_into_file('papers.csv', db_papers, fields_to_export)
+
+    # 5. Export data of authors to CSV
+    logging.info('Exporting data of authors to data/authors.csv ...')
+    db_authors = DBManager('bioinfo_authors', db_name=get_db_name())
+    fields_to_export = ['name', 'gender', 'papers', 'total_citations', 'papers_as_first_author',
+                        'papers_as_last_author', 'papers_with_citations']
+    export_db_into_file('authors.csv', db_authors, fields_to_export)
+
+    # 6. Export data of authors and papers to CSV
+    logging.info('Exporting data of papers and authors to data/papers_authors.csv ...')
+    export_author_papers('papers_authors.csv')
