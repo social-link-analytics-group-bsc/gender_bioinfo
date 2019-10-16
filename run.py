@@ -42,3 +42,5 @@ if __name__ == '__main__':
     # 6. Export data of authors and papers to CSV
     logging.info('Exporting data of papers and authors to data/papers_authors.csv ...')
     export_author_papers('papers_authors.csv')
+
+    logging.info('The files data/papers.csv, data/authors.csv, and data/papers_authors.csv were created')
