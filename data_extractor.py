@@ -793,19 +793,12 @@ def get_paper_author_names_from_pubmed():
     ec = EntrezClient()
     db_papers = DBManager('bioinfo_papers')
     db_authors = DBManager('bioinfo_authors')
-    #papers_with_pmid = db_papers.search({'pubmed_id': {'$exists': 1}, 'authors': {'$exists': 0}})
-    authors_with_unknown_gender = db_authors.search({'gender': 'unknown', 'first_name': {'$exists': 0}})
-    dois = []
-    for author in authors_with_unknown_gender:
-        dois.extend(author['dois'])
-    unique_dois = list(set(dois))
-    papers_with_pmid = db_papers.search({'DOI': {'$in': unique_dois}, 'pubmed_id': {'$exists': 1}})
+    papers_with_pmid = db_papers.search({'pubmed_id': {'$exists': 1}, 'authors': {'$exists': 0}})
     papers = [paper_with_pmid for paper_with_pmid in papers_with_pmid]
     pm_ids = []
     for paper in papers:
         if paper['pubmed_id']:
             pm_ids.append(paper['pubmed_id'])
-    pm_ids = ['19289446']
     total_ids = len(pm_ids)
     batch_size = 600 if total_ids > 600 else total_ids
     total_chunks = int(round(total_ids / batch_size, 0))
