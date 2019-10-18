@@ -21,12 +21,12 @@ def export_db_into_file(filename_to_export, db, fields_to_export):
         writer.writeheader()
         record_counter = 0
         for record in records:
-            # Do not include records with the delete flag
-            if 'delete' in record.keys():
-                logging.info(f"The record {record['_id']} contains the delete flag so it won't be exported")
-                continue
             record_counter += 1
             record_to_save = dict()
+            if 'e_id' in record:
+                record_id = record['e_id']
+            else:
+                record_id = record['id']
             for key, value in record.items():
                 if key in fields_to_export:
                     if key == 'countries':
@@ -56,13 +56,13 @@ def export_db_into_file(filename_to_export, db, fields_to_export):
                                         break
                             else:
                                 record_to_save['gender_last_author'] = '-'
-            record_to_save['id'] = record_counter
+            record_to_save['id'] = record_id
             writer.writerow(record_to_save)
+    logging.info(f"It was exported {record_to_save} records")
 
 
 def export_author_papers(filename):
     db_papers = DBManager('bioinfo_papers')
-    db_authors = DBManager('bioinfo_authors')
     papers = db_papers.search({})
     current_dir = pathlib.Path(__file__).parents[0]
     fn = current_dir.joinpath('data', filename)
@@ -73,20 +73,15 @@ def export_author_papers(filename):
         writer.writeheader()
         record_counter, papers_counter = 0, 0
         for paper in papers:
-            # Only include papers without the delete flag
-            if 'delete' in paper.keys():
-                logging.info(f"The paper {paper['_id']} contains the delete flag so it won't be exported")
-                continue
             papers_counter += 1
             paper_authors = paper.get('authors')
             authors_gender = paper.get('authors_gender')
             if paper_authors:
                 for idx in range(0, len(paper_authors)):
                     author_name = paper_authors[idx]
-                    # Only include authors without the delete flag
                     record_counter += 1
                     record_to_save = {
-                        'id': record_counter,
+                        'id': paper['e_id'],
                         'title': paper['title'],
                         'doi': paper['DOI'],
                         'year': paper['year'],
