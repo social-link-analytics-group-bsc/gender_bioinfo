@@ -26,6 +26,9 @@ def export_db_into_file(filename_to_export, db, fields_to_export):
             if 'e_id' in record:
                 record_id = record['e_id']
             else:
+                if record['id'] == '[No author name available]':
+                    # skip authors without name
+                    continue
                 record_id = record['id']
             for key, value in record.items():
                 if key in fields_to_export:
@@ -68,17 +71,20 @@ def export_author_papers(filename):
     fn = current_dir.joinpath('data', filename)
     logging.info('Exporting data of papers and authors, please wait...')
     with open(str(fn), 'w', encoding='utf-8') as f:
-        headers = ['id', 'title', 'doi', 'year', 'category', 'author', 'author_gender', 'author_position']
+        headers = ['id', 'title', 'doi', 'year', 'category', 'author_id', 'author', 'author_gender', 'author_position']
         writer = csv.DictWriter(f, fieldnames=headers)
         writer.writeheader()
-        record_counter, papers_counter = 0, 0
+        record_counter, papers_counter, papers_without_authors = 0, 0, 0
         for paper in papers:
-            papers_counter += 1
             paper_authors = paper.get('authors')
             authors_gender = paper.get('authors_gender')
             authors_id = paper.get('authors_id')
             if paper_authors:
+                papers_counter += 1
                 for idx in range(0, len(paper_authors)):
+                    if authors_id[idx] == '[No author name available]':
+                        # skip authors without name
+                        continue
                     author_name = paper_authors[idx]
                     record_counter += 1
                     record_to_save = {
@@ -94,8 +100,9 @@ def export_author_papers(filename):
                     }
                     writer.writerow(record_to_save)
             else:
-                print(f"Paper: {paper['title']} does not have authors")
+                papers_without_authors += 1
     logging.info(f"It was exported {papers_counter} papers")
+    logging.info(f"Found {papers_without_authors} papers without authors")
 
 
 def export_unknown_gender(filename):
