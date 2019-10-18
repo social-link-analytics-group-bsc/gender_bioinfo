@@ -58,7 +58,7 @@ def export_db_into_file(filename_to_export, db, fields_to_export):
                                 record_to_save['gender_last_author'] = '-'
             record_to_save['id'] = record_id
             writer.writerow(record_to_save)
-    logging.info(f"It was exported {record_to_save} records")
+    logging.info(f"It was exported {record_counter} records")
 
 
 def export_author_papers(filename):
@@ -76,6 +76,7 @@ def export_author_papers(filename):
             papers_counter += 1
             paper_authors = paper.get('authors')
             authors_gender = paper.get('authors_gender')
+            authors_id = paper.get('authors_id')
             if paper_authors:
                 for idx in range(0, len(paper_authors)):
                     author_name = paper_authors[idx]
@@ -86,6 +87,7 @@ def export_author_papers(filename):
                         'doi': paper['DOI'],
                         'year': paper['year'],
                         'category': paper['edamCategory'],
+                        'author_id': authors_id[idx],
                         'author': author_name,
                         'author_gender': authors_gender[idx],
                         'author_position': idx+1
