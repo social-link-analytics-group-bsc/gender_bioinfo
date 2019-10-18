@@ -110,7 +110,7 @@ case of articles in which organizations appear as part of the author list. Here,
 while Scopus present the name of the organization's members that authored the article. We also found PubMed 
 registries with the first and last name inverted. These registries cannot be automatically matched.
 
-In total, the gender of 27,708 authors (19%) cannot be detected by not either of the two gender identification services. 
+In total, the gender of 27,706 authors (19%) cannot be detected by not either of the two gender identification services. 
 In 10% of the cases, the gender cannot be identified because we cannot get the author name from PubMed. For the 
 rest, we found that the identification services have problems with Asian names.
 
