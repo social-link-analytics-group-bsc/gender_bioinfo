@@ -73,14 +73,14 @@ on papers' authors is recorded in `bioinfo_authors`. This function takes a while
 connects to [DOI resolution](https://dx.doi.org/) to extract links of the papers—Scopus does not provide links to the papers. 
 The completion time can be sped up by commenting the line #162 in `data_loader.py`.
 
-Duplicated records (194) and entries without DOI (401) are not stored. **In total, 46,832 records are stored in the 
+Duplicated records (195) and entries without DOI (401) are not stored. **In total, 46,831 records are stored in the 
 database**. The distribution of  duplicated articles and articles without DOI per journal is shown in the next table.
 
 | Journal                    | Duplicates|Missing DOIs|
 |----------------------------|-----------|------------|
 | Oxford Bioinformatics      | 79        |  1         |
 | Plos Computational Biology | 0         |  11        |
-| Nucleic Acids Research     | 12        |  169       |
+| Nucleic Acids Research     | 13        |  169       |
 | BMC Bioinformatics         | 76        |  100       |
 | BMC Genomics               | 27        |  120       |
 | **Total**                  | 194       |  401       |
