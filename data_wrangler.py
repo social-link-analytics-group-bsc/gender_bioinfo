@@ -1011,3 +1011,47 @@ def standardize_genders():
     logging.info(f"Updated {ret.modified_count} records")
     ret = db_authors.update_records({'gender': 'mostly_female'}, {'gender': 'female'})
     logging.info(f"Updated {ret.modified_count} records")
+
+
+def fix_inconsistencies_paper_authors():
+    db_papers = DBManager('bioinfo_papers', db_name=get_db_name())
+    db_authors = DBManager('bioinfo_authors', db_name=get_db_name())
+    papers_db = db_papers.search({})
+    papers = [paper_db for paper_db in papers_db]
+    for paper in papers:
+        if 'authors_id' in paper:
+            authors_name = []
+            authors_gender = []
+            authors_id = []
+            for author_id in paper['authors_id']:
+                author_db = db_authors.find_record({'id': author_id})
+                if author_db:
+                    authors_id.append(author_id)
+                    authors_name.append(author_db['name'])
+                    authors_gender.append(author_db['gender'])
+            db_papers.update_record({'DOI': paper['DOI']},
+                                    {'authors_id': authors_id,
+                                     'authors': authors_name,
+                                     'authors_gender': authors_gender})
+            logging.info(f"Updated paper: {paper['DOI']}")
+
+
+def add_authors_info_to_papers():
+    db_papers = DBManager('bioinfo_papers', db_name=get_db_name())
+    db_authors = DBManager('bioinfo_authors', db_name=get_db_name())
+    papers_db = db_papers.search({'authors_id': {'$exists': 0}})
+    papers = [paper_db for paper_db in papers_db]
+    for paper in papers:
+        paper_authors = db_authors.search({'dois': {'$in': [ paper['DOI'] ]}})
+        author_ids, author_names, author_genders = [], [], []
+        for paper_author in paper_authors:
+            author_ids.append(paper_author['id'])
+            if paper_author['name'] != '':
+                author_names.append(paper_author['name'])
+            else:
+                author_names.append(paper_author['last_name'])
+            author_genders.append(paper_author['gender'])
+        db_papers.update_record({'DOI': paper['DOI']},
+                                {'authors_id': author_ids,
+                                 'authors': author_names,
+                                 'authors_gender': author_genders})
