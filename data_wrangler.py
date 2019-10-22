@@ -674,22 +674,18 @@ def compute_metric_papers_as_last_author():
     papers = db_papers.search({})
     db_authors.update_all_records({'papers_as_last_author': 0})
     for paper in papers:
-        author_names = paper['authors']
-        if len(author_names) > 0:
-            last_author = author_names[-1]
-            logging.info(f"Updating the record of {last_author}")
-            author_db = db_authors.find_record({'name': last_author})
-            if not author_db:
-                author_db = db_authors.find_record({'other_names': {'$in': [last_author]}})
-                if not author_db:
-                    logging.info(f"Author {last_author} does not exist")
-                    author_gender = get_gender(last_author)
-                    author_index = len(paper['authors'])-1
-                    create_author_record(last_author, author_gender, author_index, paper, db_authors)
-                    author_db = db_authors.find_record({'name': last_author})
-            papers_as_last_author = author_db['papers_as_last_author']
-            papers_as_last_author += 1
-            db_authors.update_record({'_id': author_db['_id']}, {'papers_as_last_author': papers_as_last_author})
+        author_ids = paper['authors_id']
+        if len(author_ids) > 0:
+            last_author_id = author_ids[-1]
+            logging.info(f"Updating the record of {last_author_id}")
+            author_db = db_authors.find_record({'id': last_author_id})
+            if author_db:
+                papers_as_last_author = author_db['papers_as_last_author']
+                papers_as_last_author += 1
+                db_authors.update_record({'id': last_author_id},
+                                         {'papers_as_last_author': papers_as_last_author})
+            else:
+                logging.info(f"Author {last_author_id} does not exist")
 
 
 def fix_author_metrics():
