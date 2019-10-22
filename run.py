@@ -1,7 +1,7 @@
 from db_manager import DBManager
 from data_extractor import get_paper_author_names_from_pubmed
 from data_loader import load_data_from_files_into_db
-from data_wrangler import combine_csv_files
+from data_wrangler import combine_csv_files, compute_metric_papers_as_last_author, add_author_ids_to_papers
 from data_exporter import export_db_into_file, export_author_papers
 from utils import get_db_name
 
@@ -21,25 +21,33 @@ if __name__ == '__main__':
     logging.info('Loading data from files...')
     load_data_from_files_into_db()
 
-    # 3. Get information about the papers' authors, including their full names and gender
+    # 3. Add id of authors to papers
+    logging.info('Adding to the papers an array with the id of their authors...')
+    add_author_ids_to_papers()
+
+    # 4. Get information about the papers' authors, including their full names and gender
     logging.info('Getting full name and gender of authors...')
     get_paper_author_names_from_pubmed()
 
-    # 4. Export data of papers to CSV
+    # 5. Calculate the number of papers as last author
+    logging.info('Computing the metric papers_as_last_author...')
+    compute_metric_papers_as_last_author()
+
+    # 5. Export data of papers to CSV
     logging.info('Exporting data of papers to data/papers.csv ...')
     db_papers = DBManager('bioinfo_papers', db_name=get_db_name())
     fields_to_export = ['title', 'DOI', 'year', 'source', 'citations', 'edamCategory',
-                        'link', 'authors', 'gender_last_author']
+                        'link', 'authors', 'gender_last_author', 'abstract']
     export_db_into_file('papers.csv', db_papers, fields_to_export)
 
-    # 5. Export data of authors to CSV
-    logging.info('Exporting data of authors to data/authors.csv ...')
+    # 6. Export data of authors to CSV
+    # logging.info('Exporting data of authors to data/authors.csv ...')
     db_authors = DBManager('bioinfo_authors', db_name=get_db_name())
     fields_to_export = ['name', 'gender', 'papers', 'total_citations', 'papers_as_first_author',
                         'papers_as_last_author', 'papers_with_citations']
     export_db_into_file('authors.csv', db_authors, fields_to_export)
 
-    # 6. Export data of authors and papers to CSV
+    # 7. Export data of authors and papers to CSV
     logging.info('Exporting data of papers and authors to data/papers_authors.csv ...')
     export_author_papers('papers_authors.csv')
 
