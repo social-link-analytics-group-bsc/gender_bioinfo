@@ -31,7 +31,7 @@ googlemaps==3.0.2
 hammock==0.2.4
 haversine==2.0.0
 highered==0.2.1
-httplib2==0.12.1
+httplib2==0.19.0
 idna==2.8
 ipykernel==5.1.1
 ipython==7.5.0
