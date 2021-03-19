@@ -61,7 +61,7 @@ parso==0.4.0
 persistent==4.4.3
 pexpect==4.7.0
 pickleshare==0.7.5
-Pillow==6.2.1
+Pillow==8.1.1
 post==2019.4.13
 prometheus-client==0.7.0
 prompt-toolkit==2.0.9
