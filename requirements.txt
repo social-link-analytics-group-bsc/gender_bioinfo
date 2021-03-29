@@ -69,7 +69,7 @@ ptyprocess==0.6.0
 public==2019.4.13
 pyasn1==0.4.5
 pyasn1-modules==0.2.4
-Pygments==2.4.2
+Pygments==2.7.4
 pyhacrf-datamade==0.2.3
 PyLBFGS==0.2.0.12
 pymongo==3.7.2
